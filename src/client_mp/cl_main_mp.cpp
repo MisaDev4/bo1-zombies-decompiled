@@ -1648,7 +1648,10 @@ void __cdecl CL_Snd_Restart_f()
 {
     int n; // [esp+0h] [ebp-4h]
 
-    if ( !com_sv_running->current.enabled || Com_IsMenuLevel(0) )
+    // BO1FIX: the SP front end is a running level ("frontend") too, so applying a new sound device from its
+    // options was refused ("Listen server cannot sound restart") and the choice was never stored in
+    // sd_xa2_device_guid - the device reverted. It is a menu level like Com_IsMenuLevel's, so allow it there.
+    if ( !com_sv_running->current.enabled || Com_IsMenuLevel(0) || Com_IsSPFrontEndRunning() )
     {
         n = Dvar_GetInt("sd_xa2_device_name");
         Dvar_SetIntByName("sd_xa2_device_guid", n);
@@ -3880,6 +3883,15 @@ static void __cdecl SV_SaveGameLastCommit_f()
 {
 }
 cmd_function_s SV_SaveGameLastCommit_f_VAR;
+
+// BO1FIX: the SP front end's menus run the console party commands xstopparty / xstopprivateparty, which this
+// exe never registered, so backing out of a menu printed "Unknown command" on screen. There are no console
+// parties on PC; they do nothing here. (update_sv_savegameavailable, run by the same menus, is ui_main.cpp's.)
+static void __cdecl CL_SPFrontEndNoOp_f()
+{
+}
+static const char *s_spFrontEndNoOpCommands[] = { "xstopparty", "xstopprivateparty" };
+static cmd_function_s s_spFrontEndNoOpCommandVars[ARRAY_COUNT(s_spFrontEndNoOpCommands)];
 cmd_function_s SV_SaveGameLastCommit_f_VAR_SERVER;
 
 cmd_function_s CL_ForwardToServer_f_VAR;
@@ -4264,6 +4276,8 @@ void __cdecl CL_InitOnceForAllClients()
         // zombies: SP 0x004FD3C8
         Cmd_AddCommandInternal("savegame_lastcommit", Cbuf_AddServerText_f, &SV_SaveGameLastCommit_f_VAR);
         Cmd_AddServerCommandInternal("savegame_lastcommit", SV_SaveGameLastCommit_f, &SV_SaveGameLastCommit_f_VAR_SERVER);
+        for ( unsigned int i = 0; i < ARRAY_COUNT(s_spFrontEndNoOpCommands); ++i )
+            Cmd_AddCommandInternal(s_spFrontEndNoOpCommands[i], CL_SPFrontEndNoOp_f, &s_spFrontEndNoOpCommandVars[i]);
     }
     Cmd_AddCommandInternal("clientinfo", CL_Clientinfo_f, &CL_Clientinfo_f_VAR);
     Cmd_AddCommandInternal("vid_restart", Cbuf_AddServerText_f, &CL_Vid_Restart_f_VAR);
@@ -4706,6 +4720,8 @@ void __cdecl CL_Shutdown(int localClientNum)
             Cmd_RemoveCommand("cmd");
             Cmd_RemoveCommand("configstrings");
             Cmd_RemoveCommand("pause"); // zombies: registered with bo1_zombies (CL_Pause_f)
+            for ( unsigned int i = 0; i < ARRAY_COUNT(s_spFrontEndNoOpCommands); ++i )
+                Cmd_RemoveCommand(s_spFrontEndNoOpCommands[i]);
             Cmd_RemoveCommand("clientinfo");
             Cmd_RemoveCommand("vid_restart");
             Cmd_RemoveCommand("snd_restart");

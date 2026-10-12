@@ -633,7 +633,12 @@ void __cdecl Com_InitDynamicRender()
     v1 = Com_IsMenuLevel(0);
     R_ExtraCam_Init(v1);
     v2 = Com_IsMenuLevel(0);
-    R_UI3D_OnetimeInit(0x80u, 0x80u, 0, v2, 0);
+    // BO1FIX: the SP front end (the "frontend" level) draws its whole menu onto the in-world monitor through
+    // this target, and at MP's 128x128 the 640x480 menu got ~5x fewer pixels and the small font - blurry text.
+    // Windows and UVs are normalized (ui3dsetwindow, ui3dUVSetup*), so only the pixel count changes; it stays
+    // square so the client script's windows keep their aspect. ~8 MB with its depth surface, front end only.
+    const unsigned __int16 ui3dSize = Com_IsSPFrontEndLevel(sv_mapname->current.string) ? 1024 : 0x80;
+    R_UI3D_OnetimeInit(ui3dSize, ui3dSize, 0, v2, 0);
 }
 
 void __cdecl Com_InitDynamicMemorySystems()
