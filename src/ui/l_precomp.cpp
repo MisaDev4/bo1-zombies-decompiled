@@ -2,6 +2,7 @@
 #include <qcommon/common.h>
 #include "l_memory.h"
 #include <time.h>
+#include <string.h>
 
 struct directive_s // sizeof=0x8
 {                                       // XREF: .rdata:directives/r

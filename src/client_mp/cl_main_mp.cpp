@@ -3233,6 +3233,7 @@ void __cdecl CL_Frame(int localClientNum, int msec)
             LocalClientGlobals = CL_GetLocalClientGlobals(localClientNum);
             CG_Flame_Age_All_Objects(LocalClientGlobals->serverTime);
             CG_GenerateFireSounds(localClientNum);
+            Com_UpdateMapLoadCinematic(localClientNum); // BO1FIX: ends the loading video once the level shows
         }
         CG_UpdateDestructibles(localClientNum, msec);
     }

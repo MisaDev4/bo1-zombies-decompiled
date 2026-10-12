@@ -737,6 +737,7 @@ void __cdecl SCR_DrawScreenField(int localClientNum, int refreshedUI)
 {
     connstate_t clcState; // [esp+8h] [ebp-4h]
 
+    Com_UpdateLevelBriefingMaterial(); // BO1FIX: the loading screen's material (placeholder, video handoff)
     R_BeginSharedCmdList();
     R_AddCmdProjectionSet2D();
     R_UI3D_PerframeInit();

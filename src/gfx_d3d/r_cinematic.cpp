@@ -1680,6 +1680,14 @@ bool __cdecl R_Cinematic_IsStarted()
     return !R_Cinematic_IsFinished() && cinematicGlob.currentCinematicName[0];
 }
 
+// BO1FIX: true once the named cinematic is the current one and has a decoded frame in the renderer
+// images, so a material that samples them shows the video and not a stale or black frame.
+bool __cdecl R_Cinematic_IsShowingFrameOf(const char *name)
+{
+    return R_Cinematic_IsStarted() && cinematicGlob.activeImageFrame != CINEMATIC_INVALID_IMAGE_FRAME
+        && !I_stricmp(cinematicGlob.currentCinematicName, name);
+}
+
 bool __cdecl R_Cinematic_IsNextReady()
 {
     return R_Cinematic_IsNextReady_Internal();

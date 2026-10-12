@@ -122,6 +122,7 @@ void __cdecl R_Cinematic_StartPlayback_SP(const char *name, unsigned int playbac
 void __cdecl R_Cinematic_Pause_SP(bool byScript); // zombies: SP 0x006D9F90
 void __cdecl R_Cinematic_Unpause_SP(bool byScript); // zombies: SP 0x006D9FE0
 bool __cdecl R_Cinematic_IsStarted();
+bool __cdecl R_Cinematic_IsShowingFrameOf(const char *name); // BO1FIX: loading video handoff
 bool __cdecl R_Cinematic_IsNextReady();
 char __cdecl R_Cinematic_IsUnderrun();
 void __cdecl R_Cinematic_ForceRelinquishIO();

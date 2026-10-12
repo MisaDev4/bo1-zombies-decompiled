@@ -2,6 +2,7 @@
 #include "r_sky.h"
 #include <universal/com_shared.h>
 #include <universal/q_shared.h>
+#include <string.h>
 
 void __cdecl R_LoadSun(const char *name, sunflare_t *sun)
 {
