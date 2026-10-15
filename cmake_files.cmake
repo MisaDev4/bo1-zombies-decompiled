@@ -2805,6 +2805,8 @@ set(SRC_WIN32
 	"${SRC_DIR}/win32/win_configure.h"
 	"${SRC_DIR}/win32/win_content.cpp"
 	"${SRC_DIR}/win32/win_content.h"
+	"${SRC_DIR}/win32/win_dualsense.cpp"
+	"${SRC_DIR}/win32/win_dualsense.h"
 	"${SRC_DIR}/win32/win_gamepad.cpp"
 	"${SRC_DIR}/win32/win_gamepad.h"
 	"${SRC_DIR}/win32/win_gamerprofile.cpp"

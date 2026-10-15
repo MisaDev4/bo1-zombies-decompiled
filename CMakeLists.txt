@@ -82,6 +82,8 @@ target_link_libraries(BO1Zombies PUBLIC
     dsound.lib
     winmm.lib
     xinput.lib
+    setupapi.lib
+    hid.lib
     xapobase.lib
     dxerr.lib
     libvpx.lib
