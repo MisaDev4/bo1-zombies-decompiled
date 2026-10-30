@@ -3385,7 +3385,6 @@ void __cdecl CL_ShutdownWorld()
 void __cdecl CL_SetupViewport()
 {
     int displayHeight; // [esp+4h] [ebp-10h]
-    ScreenPlacement *scrPlace; // [esp+8h] [ebp-Ch]
     int localClientNum; // [esp+Ch] [ebp-8h]
     int displayWidth; // [esp+10h] [ebp-4h]
 
@@ -3397,8 +3396,7 @@ void __cdecl CL_SetupViewport()
         ScrPlace_SetupViewport(&scrPlaceFull, 0, 0, displayWidth, displayHeight);
         for ( localClientNum = 0; localClientNum < 1; ++localClientNum )
             ScrPlace_SetupViewport(&scrPlaceView[localClientNum], 0, 0, displayWidth, displayHeight);
-        scrPlace = R_UI3D_ScrPlaceFromTextureWindow(0);
-        ScrPlace_SetupUI3DForFullscreen(scrPlace, &scrPlaceFull);
+        R_UI3D_MatchFullscreenPlacement(&scrPlaceFull);
     }
 }
 

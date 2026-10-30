@@ -2891,8 +2891,7 @@ static void Com_SetLevelBriefingMaterial(const char *replacement)
     Sys_EnterCriticalSection(CRITSECT_DBHASH);
     DB_ReplaceXAsset(ASSET_TYPE_MATERIAL, (char *)"$levelbriefing", replacement);
     Sys_LeaveCriticalSection(CRITSECT_DBHASH);
-    s_levelBriefingHasLevelArt = I_stricmp(replacement, "black") != 0;
-}
+    s_levelBriefingHasLevelArt = I_stricmp(replacement, "black") != 0;}
 
 // A material that did not resolve. The asset database stubs a missing one with a copy of its own default
 // material ("default", g_defaultAssetName), which Material_IsDefault - a test against the renderer's
@@ -2912,6 +2911,7 @@ static void Com_SetLevelBriefingStillArt(const char *mapName)
     const char *stillArt = va("loadscreen_%s", mapName);
     if (Com_IsMissingMaterial(Material_RegisterHandle((char *)stillArt, 0)))
         stillArt = "black";
+    Com_Printf(16, "loading screen still art for '%s': %s\n", mapName, stillArt);
     Com_SetLevelBriefingMaterial(stillArt);
 }
 
@@ -2949,6 +2949,7 @@ void __cdecl Com_UpdateLevelBriefingMaterial()
     if (!s_mapLoadCinematicHandoffPending || !R_Cinematic_IsShowingFrameOf(s_mapLoadCinematicName))
         return;
     s_mapLoadCinematicHandoffPending = false;
+    Com_Printf(16, "loading screen: showing the loading video\n");
     Com_SetLevelBriefingMaterial("cinematic");
 }
 

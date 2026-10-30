@@ -65,6 +65,8 @@ void __cdecl R_UI3DStack_Pop(GfxUI3DStack *stack);
 int __cdecl R_UI3DStack_Top(GfxUI3DStack *stack);
 ScreenPlacement *__cdecl R_UI3D_ScrPlaceFromTextureWindow(unsigned int windowIndex);
 void __cdecl R_UI3D_SetBlurRadius(float blurRadius);
+// BO1FIX: window 0 takes the full-screen placement only when the UI3D target is the size of the display
+void __cdecl R_UI3D_MatchFullscreenPlacement(const ScreenPlacement *fullScrPlace);
 void __cdecl R_UI3D_CheckRenderTarget();
 void __cdecl R_UI3D_OnetimeInit(
                 unsigned __int16 width,

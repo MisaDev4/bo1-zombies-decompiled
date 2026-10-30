@@ -67,9 +67,19 @@ void __cdecl R_UI3D_SetBlurRadius(float blurRadius)
     g_ui3dStatus.blurRadius = blurRadius;
 }
 
+// BO1FIX: a texture or video setting change resets the device and calls this (R_UI3D_CheckRenderTarget,
+// CL_SetupViewport) with the display-sized placement. The SP front end draws its menu onto the monitor through a
+// UI3D target that is not display sized: its placement (set by R_UI3D_SetupTextureWindow from the window's own
+// pixel size) was replaced by the display's, so the menu was drawn several times too large and the monitor showed
+// a zoomed-in corner of it.
+void __cdecl R_UI3D_MatchFullscreenPlacement(const ScreenPlacement *fullScrPlace)
+{
+    if ( g_ui3dStatus.useDisplaySize )
+        ScrPlace_SetupUI3DForFullscreen(&g_ui3d_windows[0].scrPlace, (ScreenPlacement *)fullScrPlace);
+}
+
 void __cdecl R_UI3D_CheckRenderTarget()
 {
-    ScreenPlacement *scrPlace; // [esp+10h] [ebp-Ch]
     signed int i; // [esp+18h] [ebp-4h]
 
     if (g_ui3dStatus.useDisplaySize)
@@ -92,10 +102,7 @@ void __cdecl R_UI3D_CheckRenderTarget()
                 g_ui3d_windows[i].normW,
                 g_ui3d_windows[i].normH);
         if (r_glob.isMultiplayer)
-        {
-            scrPlace = R_UI3D_ScrPlaceFromTextureWindow(0);
-            ScrPlace_SetupUI3DForFullscreen(scrPlace, &scrPlaceFull);
-        }
+            R_UI3D_MatchFullscreenPlacement(&scrPlaceFull);
     }
 }
 
