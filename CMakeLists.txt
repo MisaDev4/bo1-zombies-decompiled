@@ -1,4 +1,8 @@
 cmake_minimum_required(VERSION 3.16)
+# Debug, Release, and Profile: Release plus the Tracy profiler (TRACY_ON_DEMAND, so it costs almost nothing until the
+# Tracy 0.13.x viewer connects). Profile writes BO1Zombies_profile.exe next to the Release exe, so it runs from the same
+# folder (Play.bat profile).
+set(CMAKE_CONFIGURATION_TYPES "Debug;Release;Profile")
 project(BO1Zombies)
 
 set(BIN_NAME "BO1Zombies")
@@ -43,12 +47,17 @@ target_compile_definitions(BO1Zombies PUBLIC
 # Debug-only
 target_compile_definitions(BO1Zombies PUBLIC
     $<$<CONFIG:Debug>:_DEBUG>
-    $<$<CONFIG:Debug>:TRACY_ENABLE>
-    $<$<CONFIG:Debug>:TRACY_ON_DEMAND>
 )
-# Release-only
+# Debug and Profile: Tracy. The client listens on 127.0.0.1 only (no firewall prompt, nothing on the network), so run
+# the viewer on the same PC.
 target_compile_definitions(BO1Zombies PUBLIC
-    $<$<CONFIG:Release>:NDEBUG>
+    $<$<OR:$<CONFIG:Debug>,$<CONFIG:Profile>>:TRACY_ENABLE>
+    $<$<OR:$<CONFIG:Debug>,$<CONFIG:Profile>>:TRACY_ON_DEMAND>
+    $<$<OR:$<CONFIG:Debug>,$<CONFIG:Profile>>:TRACY_ONLY_LOCALHOST>
+)
+# Release and Profile
+target_compile_definitions(BO1Zombies PUBLIC
+    $<$<NOT:$<CONFIG:Debug>>:NDEBUG>
 )
 
 # ----- Include directories -----
@@ -72,6 +81,21 @@ target_link_directories(BO1Zombies PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/src/nvapi
 
 set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /MT  /O2 /MP /W3 ${MSVC_WARNING_DISABLES} /permissive")
 set(CMAKE_CXX_FLAGS_DEBUG   "${CMAKE_CXX_FLAGS_DEBUG} /MTd /Od /MP /W3 ${MSVC_WARNING_DISABLES} /permissive")
+# Profile compiles and links exactly like Release
+set(CMAKE_CXX_FLAGS_PROFILE        "${CMAKE_CXX_FLAGS_RELEASE}")
+set(CMAKE_C_FLAGS_PROFILE          "${CMAKE_C_FLAGS_RELEASE}")
+set(CMAKE_EXE_LINKER_FLAGS_PROFILE "${CMAKE_EXE_LINKER_FLAGS_RELEASE}")
+
+# Whole-program optimisation (Release and Profile): /GL compiles to an intermediate form and the linker optimises
+# across files (inlining between translation units, dropping unreferenced code with /OPT:REF, which /DEBUG otherwise
+# turns off). /LTCG:INCREMENTAL regenerates only the functions whose inputs changed, so a one-file edit still links
+# quickly. No /OPT:ICF: folding identical functions would make crash offsets symbolize to the wrong name.
+# -DBO1_LTCG=OFF for the plain per-file /O2 build.
+option(BO1_LTCG "Whole-program optimisation (/GL + /LTCG) for Release and Profile" ON)
+if(MSVC AND BO1_LTCG)
+    target_compile_options(BO1Zombies PRIVATE $<$<NOT:$<CONFIG:Debug>>:/GL>)
+    target_link_options(BO1Zombies PRIVATE "$<$<NOT:$<CONFIG:Debug>>:/LTCG:INCREMENTAL;/OPT:REF;/CGTHREADS:8>")
+endif()
 
 if (MSVC AND WIN32 AND NOT MSVC_VERSION VERSION_LESS 142)
     target_link_options(BO1Zombies PRIVATE $<$<CONFIG:Debug>:/INCREMENTAL>)
@@ -104,8 +128,8 @@ target_link_libraries(BO1Zombies PUBLIC
 )
 # ----- Debug Links -----
 target_link_libraries(BO1Zombies PUBLIC $<$<CONFIG:Debug>:d3dx9d.lib>)
-# ----- Release Links -----
-target_link_libraries(BO1Zombies PUBLIC $<$<CONFIG:Release>:d3dx9.lib>)
+# ----- Release and Profile Links -----
+target_link_libraries(BO1Zombies PUBLIC $<$<NOT:$<CONFIG:Debug>>:d3dx9.lib>)
 target_link_options(BO1Zombies PRIVATE /machine:x86)
 
 # ----- Linker Options -----
@@ -115,22 +139,27 @@ target_link_options(BO1Zombies PRIVATE /machine:x86)
 target_link_options(BO1Zombies PRIVATE /DYNAMICBASE:NO /LARGEADDRESSAWARE /DEBUG)
 
 set_target_properties(BO1Zombies PROPERTIES WIN32_EXECUTABLE TRUE)
-# Set the VS debugger's working directory to the build-output dir for whichever config is active 
+# Profile: build\Release\BO1Zombies_profile.exe (+ .pdb), beside the Release exe and its game files
 set_target_properties(BO1Zombies PROPERTIES
-    VS_DEBUGGER_WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/$<CONFIG>"
+    RUNTIME_OUTPUT_DIRECTORY_PROFILE "${CMAKE_BINARY_DIR}/Release"
+    OUTPUT_NAME_PROFILE "${BIN_NAME}_profile"
+)
+# Set the VS debugger's working directory to the exe's folder for whichever config is active
+set_target_properties(BO1Zombies PROPERTIES
+    VS_DEBUGGER_WORKING_DIRECTORY "$<TARGET_FILE_DIR:BO1Zombies>"
 )
 
 # Mods live apart from the base game: mods/<name>/ is copied next to the exe on every build and is only
 # loaded with +set fs_game mods/<name> (see mods/sandbox/README.md), or several at once with +set fs_mods "a b c"
 # (mods/_stack/maps/_modstack.gsc). Without fs_game / fs_mods nothing in it is read.
 add_custom_target(copy_mods ALL
-    COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_CURRENT_SOURCE_DIR}/mods" "${CMAKE_BINARY_DIR}/$<CONFIG>/mods"
+    COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_CURRENT_SOURCE_DIR}/mods" "$<TARGET_FILE_DIR:BO1Zombies>/mods"
     COMMENT "Copying mods/ to the run folder")
 
 # Base-game data files the install does not carry (data/main/ -> main/ next to the exe), e.g. playlists_sp.info,
 # the offline stand-in for the retail online WAD entry (see BG_SetZombieExternalDvars in src/bgame/bg_misc.cpp).
 add_custom_target(copy_base_data ALL
-    COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_CURRENT_SOURCE_DIR}/data/main" "${CMAKE_BINARY_DIR}/$<CONFIG>/main"
+    COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_CURRENT_SOURCE_DIR}/data/main" "$<TARGET_FILE_DIR:BO1Zombies>/main"
     COMMENT "Copying data/main/ to the run folder")
 
 # Keep the build machine's folder out of the binary: source paths in asserts are trimmed to the project and the
