@@ -3983,14 +3983,16 @@ void __cdecl UI_LoadIngameMenus(int contextIndex)
         {
             menuList = UI_LoadMenus("ui/ingame_options.txt", 3);
             UI_AddMenuList(contextIndex, &uiInfo->uiDC, menuList, 1);
-            static cmd_function_s updateSaveGameAvailableCommand;
-            static bool commandRegistered;
-            if ( !commandRegistered )
-            {
-                Cmd_AddCommandInternal("update_sv_savegameavailable", UI_SP_UpdateSaveGameAvailable_f,
-                    &updateSaveGameAvailableCommand);
-                commandRegistered = true;
-            }
+        }
+        // BO1FIX: the SP front end's menus run it too (backing out of a menu printed "Unknown command"), so it is
+        // registered on every UI load, not only in a zombies level.
+        static cmd_function_s updateSaveGameAvailableCommand;
+        static bool commandRegistered;
+        if ( !commandRegistered )
+        {
+            Cmd_AddCommandInternal("update_sv_savegameavailable", UI_SP_UpdateSaveGameAvailable_f,
+                &updateSaveGameAvailableCommand);
+            commandRegistered = true;
         }
         UI_ModFov_PatchMenus(&uiInfo->uiDC); // mod: bo1_mod_fov
     }

@@ -1,5 +1,6 @@
 #include "rb_draw3d.h"
 #include "r_dvars.h"
+#include "r_cinematic.h"
 #include "r_state.h"
 #include "rb_backend.h"
 #include "r_state_utils.h"
@@ -627,8 +628,16 @@ static void __cdecl R_ShaderWarmingCallback(const void *userData, GfxCmdBufConte
         vb->Unlock();
     }
 
+    unsigned int lastCinematicUpdateMs = Sys_Milliseconds();
     for ( int materialIndex = 0; materialIndex < rgp.materialCount; ++materialIndex )
     {
+        // BO1FIX: the warm pass holds the render thread for seconds, and the render thread is what feeds a
+        // playing cinematic (RB_BeginFrame) - the level's loading video, whose music stuttered here.
+        if ( Sys_Milliseconds() - lastCinematicUpdateMs >= 15 )
+        {
+            lastCinematicUpdateMs = Sys_Milliseconds();
+            R_Cinematic_UpdateFrame(0);
+        }
         Material *material = rgp.sortedMaterials[materialIndex];
         for ( unsigned int techType = 10; techType <= 30; ++techType ) // TECHNIQUE_LIT .. TECHNIQUE_LIT_OMNI_SHADOW_GLIGHT
         {

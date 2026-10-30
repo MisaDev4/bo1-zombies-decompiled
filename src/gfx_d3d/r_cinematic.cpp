@@ -1427,16 +1427,42 @@ void __stdcall R_Cinematic_Bink_Free(void *ptr)
         cinematicGlob.binkHunk.fragmented = 1;
 }
 
+// The places a streamed (non rawfile) video <filename>.bik is looked for, in order: the working folder, then the
+// game install (fs_cdpath, which setup.ps1 records), so the build folder needs no copy or link of the game's
+// main\video folder. Returns how many paths were written.
+static int R_Cinematic_VideoPaths(const char *filename, char (*filepath)[256])
+{
+    char *cwd = Sys_Cwd();
+    if ( !cwd && !Assert_MyHandler("C:\\projects_pc\\cod\\codsrc\\src\\gfx_d3d\\r_cinematic.cpp", 2479, 0, "%s", "cwd") )
+        __debugbreak();
+    _snprintf(filepath[0], 0x100u, "%s\\main\\video\\%s.%s", cwd, filename, "bik");
+    _snprintf(filepath[1], 0x100u, "%s\\raw\\video\\%s.%s", cwd, filename, "bik");
+    if ( !fs_cdpath || !*fs_cdpath->current.string )
+        return 2;
+    _snprintf(filepath[2], 0x100u, "%s\\main\\video\\%s.%s", fs_cdpath->current.string, filename, "bik");
+    _snprintf(filepath[3], 0x100u, "%s\\raw\\video\\%s.%s", fs_cdpath->current.string, filename, "bik");
+    return 4;
+}
+
+// true if the streamed video <filename>.bik exists where R_Cinematic_BinkOpen would find it
+bool __cdecl R_Cinematic_VideoExists(const char *filename)
+{
+    char filepath[4][256];
+    const int pathCount = R_Cinematic_VideoPaths(filename, filepath);
+    for ( int i = 0; i < pathCount; ++i )
+    {
+        if ( GetFileAttributesA(filepath[i]) != INVALID_FILE_ATTRIBUTES )
+            return true;
+    }
+    return false;
+}
+
 bool __cdecl R_Cinematic_BinkOpen(const char *filename, char playbackFlags, char *errText, unsigned int errTextSize)
 {
-    char *cwd; // [esp+4h] [ebp-20Ch]
     char filepath[4][256]; // [esp+8h] [ebp-208h] BYREF
     int pathCount;
     int i;
 
-    cwd = Sys_Cwd();
-    if ( !cwd && !Assert_MyHandler("C:\\projects_pc\\cod\\codsrc\\src\\gfx_d3d\\r_cinematic.cpp", 2479, 0, "%s", "cwd") )
-        __debugbreak();
     if ( (playbackFlags & 8) != 0 )
     {
         _snprintf(filepath[0], 0x100u, "bik/%s.%s", filename, "bik");
@@ -1444,17 +1470,7 @@ bool __cdecl R_Cinematic_BinkOpen(const char *filename, char playbackFlags, char
     }
     else
     {
-        _snprintf(filepath[0], 0x100u, "%s\\main\\video\\%s.%s", cwd, filename, "bik");
-        _snprintf(filepath[1], 0x100u, "%s\\raw\\video\\%s.%s", cwd, filename, "bik");
-        pathCount = 2;
-        // not in the working folder: the game install, fs_cdpath (setup.ps1 records it), so the build folder needs
-        // no copy or link of the game's main\video folder
-        if ( fs_cdpath && *fs_cdpath->current.string )
-        {
-            _snprintf(filepath[2], 0x100u, "%s\\main\\video\\%s.%s", fs_cdpath->current.string, filename, "bik");
-            _snprintf(filepath[3], 0x100u, "%s\\raw\\video\\%s.%s", fs_cdpath->current.string, filename, "bik");
-            pathCount = 4;
-        }
+        pathCount = R_Cinematic_VideoPaths(filename, filepath);
     }
     for ( i = 0; i < pathCount; ++i )
     {
@@ -1693,6 +1709,14 @@ bool __cdecl R_Cinematic_IsFinished()
 bool __cdecl R_Cinematic_IsStarted()
 {
     return !R_Cinematic_IsFinished() && cinematicGlob.currentCinematicName[0];
+}
+
+// BO1FIX: true once the named cinematic is the current one and has a decoded frame in the renderer
+// images, so a material that samples them shows the video and not a stale or black frame.
+bool __cdecl R_Cinematic_IsShowingFrameOf(const char *name)
+{
+    return R_Cinematic_IsStarted() && cinematicGlob.activeImageFrame != CINEMATIC_INVALID_IMAGE_FRAME
+        && !I_stricmp(cinematicGlob.currentCinematicName, name);
 }
 
 bool __cdecl R_Cinematic_IsNextReady()
