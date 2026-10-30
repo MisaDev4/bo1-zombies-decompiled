@@ -35,6 +35,8 @@
 #include <sound/snd_public_async.h>
 #include <cgame/cg_sound.h>
 #include <game_sp/g_sp_savegame.h>
+#include "ui_main.h"
+#include <client/client.h>
 
 cmd_function_s UI_SetLocalVarBool_f_VAR;
 cmd_function_s UI_SetLocalVarInt_f_VAR;
@@ -1262,6 +1264,23 @@ itemDef_s *__cdecl Menu_ClearFocus(int localClientNum, UiContext *dc, menuDef_t 
     return ret;
 }
 
+// zombies: SP's menu stack tells the level script about every menu it pushes or pops - "cmd mlvl open <menu>" /
+// "cmd mlvl close <menu>" (SP .rdata 0x009F41F8 / 0x00A23160) when ui_menuLvlNotify is set and cl_paused is 0
+// (SP 0x00839910 / 0x00839880). The server's "mlvl" runs CodeCallback_MenuMessage, and the front end's
+// menu_message keys its state on it: "open main_online" / "open levels_zombie" set in_zombie_menu, which switches
+// the music to ZOMBIE_TIME (frontend_amb.gsc), and "open main_text" leaves the title screen. KB's MP stack sent
+// nothing, so the front end kept the title screen music in every menu. ui_menuLvlNotify is 0 in MP.
+// Not SP: nothing is sent before the client connects - KB opens its boot menus before the front end level is up, and
+// the "cmd" then only printed "Not connected to a server."
+static void Menus_SendLevelNotify(int localClientNum, const char *event, const menuDef_t *menu)
+{
+    if ( !ui_menuLvlNotify || !ui_menuLvlNotify->current.enabled || !cl_paused || cl_paused->current.integer )
+        return;
+    if ( CL_GetLocalClientConnectionState(localClientNum) < CA_CONNECTED )
+        return;
+    Cbuf_AddText(localClientNum, va("cmd mlvl %s %s\n", event, menu->window.name));
+}
+
 int __cdecl Menus_RemoveFromStack(int localClientNum, UiContext *dc, menuDef_t *pMenu)
 {
     int v3; // eax
@@ -1281,6 +1300,7 @@ int __cdecl Menus_RemoveFromStack(int localClientNum, UiContext *dc, menuDef_t *
         dc->menuStack[i].menu = dc->menuStack[i + 1].menu;
         dc->menuStack[i++].localClientNum = v3;
     }
+    Menus_SendLevelNotify(localClientNum, "close", pMenu);
     return 1;
 }
 
@@ -4377,6 +4397,7 @@ void __cdecl Menus_AddToStack(int localClientNum, UiContext *dc, menuDef_t *pMen
         {
             dc->menuStack[i + 1].menu = pMenu;
             dc->menuStack[i + 1].localClientNum = localClientNum;
+            Menus_SendLevelNotify(localClientNum, "open", pMenu);
             return;
         }
         v3 = dc->menuStack[i].localClientNum;
