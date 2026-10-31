@@ -18,6 +18,10 @@
 #include <bgame/bg_local.h>
 #include <clientscript/cscr_vm.h>
 #include <universal/dvar.h>
+#include <cgame_mp/cg_scoreboard_mp.h>
+#include <game_mp/g_scr_main_mp.h>
+#include <game_mp/g_utils_mp.h>
+#include <cstring>
 
 // zombies: GetDvarVector, the server one (SP 0x007f0380). Same as CScr_GetDvarVector (cg_scr_main.cpp) on the
 // server instance, with the server's shorter "not found" text.
@@ -118,19 +122,81 @@ static int GScrSP_GetObjectiveIndex()
 }
 
 // zombies: Objective_String( index, text ) (SP 0x007f70b0 -> 0x007f6e80). NOT PORTED beyond the index check:
-// SP writes the text into configstring 0x142 + index for its SP objective display, which the port does not
-// have (KB's MP objectives are a different system and the zombietron HUD is not ported, cg_sp_hud.cpp).
+// SP writes the text into configstring 0x142 + index for its objectives list (the pause menu's), which the
+// port does not have. The 3D marker's text is Objective_Set3D's.
 static void GScrSP_Objective_String()
 {
     GScrSP_GetObjectiveIndex();
 }
 
-// zombies: Objective_Set3D( index, enable, [colour], [text], ... ) (SP 0x007f7530). NOT PORTED beyond the index
-// check: SP sets the 3D marker bits of its level objective (SP 0x01c0418c + index * 0x30, +0x24 / +0x28) and its
-// text configstring 0x142 + index; DOA's arena exit arrows and tutorial prompts. See Objective_String.
+// SP keeps the 3D marker's text in its objective configstring ("txt3d"). The port sends it with the objective
+// instead, as a CS_LOCALIZED_STRINGS index in objective_t's alt_3D_text slot (SP objective +0x2c; KB never uses
+// that pointer), networked by the zombiemode objective fields (MSG_GetNetFieldList). 0 = no text.
+void G_SP_SetObjective3DText(objective_t *obj, int localizedStringIndex)
+{
+    static_assert(sizeof(obj->alt_3D_text) == sizeof(int), "alt_3D_text carries an int");
+    memcpy(&obj->alt_3D_text, &localizedStringIndex, sizeof(int));
+}
+
+int G_SP_GetObjective3DText(const objective_t *obj)
+{
+    int localizedStringIndex;
+    memcpy(&localizedStringIndex, &obj->alt_3D_text, sizeof(int));
+    return localizedStringIndex;
+}
+
+// zombies: Objective_Set3D( index, enable, [colour], [text], [ui3dWindow], [offset] ) (SP 0x007f7530): the
+// objective's 3D marker (ownerdraw 322, cg_sp_hud.cpp). use3D (SP +0x24) holds enable in bit 0 and the UI3D
+// window + 1 in bits 1..4; color (SP +0x28) is 1 white, 2 red, 3 green, 4 blue, 5 ltblue, 0 any other name
+// (cg_objectiveIndicatorColor). The text "*" draws no on-screen marker, only the off-screen arrow (DOA's exits);
+// no text shows the distance. NOT PORTED: the offset (SP keys offx / offy / offz), which only the 6-argument form
+// sets and DOA does not use.
 static void GScrSP_Objective_Set3D()
 {
-    GScrSP_GetObjectiveIndex();
+    const int numParam = Scr_GetNumParam(SCRIPTINSTANCE_SERVER);
+    objective_t *obj = &level.objectives[GScrSP_GetObjectiveIndex()];
+    char text[1024];
+
+    obj->use3D = 0;
+    obj->color = 0;
+    text[0] = 0;
+    switch (numParam)
+    {
+    case 6:
+    case 5:
+    {
+        const int window = Scr_GetInt(4, SCRIPTINSTANCE_SERVER);
+        obj->use3D |= ((window < 0 ? 0 : window + 1) & 0xF) * 2;
+    }
+        [[fallthrough]];
+    case 4:
+        Scr_ConstructMessageString(3, 3, "Objective String", text, sizeof(text));
+        if (strlen(text) >= sizeof(text) - 1)
+            Scr_Error(va("Objective strings is too long (> %i): %s\n", 1023, text), false);
+        [[fallthrough]];
+    case 3:
+    {
+        const char *colorName = Scr_GetString(2, SCRIPTINSTANCE_SERVER);
+        if (!strcmp(colorName, "white"))
+            obj->color = 1;
+        else if (!strcmp(colorName, "red"))
+            obj->color = 2;
+        else if (!strcmp(colorName, "green"))
+            obj->color = 3;
+        else if (!strcmp(colorName, "blue"))
+            obj->color = 4;
+        else if (!strcmp(colorName, "ltblue"))
+            obj->color = 5;
+    }
+        [[fallthrough]];
+    case 2:
+        obj->use3D |= Scr_GetInt(1, SCRIPTINSTANCE_SERVER) & 1;
+        break;
+    default:
+        Scr_Error(va("Invalid argument count. Expected 2-6, given %d\n", numParam), false);
+        break;
+    }
+    G_SP_SetObjective3DText(obj, text[0] ? G_LocalizedStringIndex(text) : 0);
 }
 
 // zombies: SetScale( scale ) (SP 0x007f4bc0), script movers only. Stores scale * 6553.5 + 0.5 (scale 0..10
@@ -178,7 +244,7 @@ static void PlayerCmdSP_ClearDamageIndicator(scr_entref_t entref)
 
 // zombies: GetScoreMultiplier() / SetScoreMultiplier( n ) (SP 0x007d9bc0 / 0x007d9be0): clientState
 // score.scoreMultiplier (SP cs+0xc8, a 14 bit netfield), which only the zombietron HUD reads. KB's score_s has
-// no such field, so it is kept here (cleared with the client's fields) and not sent. SP indexes the client state by entnum
+// no such field, so it is kept here (cleared with the client's fields) and sent as a scoreboard column. SP indexes the client state by entnum
 // without a player check; the port checks.
 static int s_scoreMultiplier[ARRAY_COUNT(g_clients)];
 
@@ -197,8 +263,11 @@ static void PlayerCmdSP_GetScoreMultiplier(scr_entref_t entref)
 static void PlayerCmdSP_SetScoreMultiplier(scr_entref_t entref)
 {
     int multiplier = Scr_GetInt(0, SCRIPTINSTANCE_SERVER);
-    if (GScrSP_Player(entref))
+    if (gentity_s *ent = GScrSP_Player(entref))
+    {
         s_scoreMultiplier[entref.entnum] = multiplier;
+        G_SP_SetScoreColumn(ent->client, SB_ZT_MULTIPLIER, multiplier); // the HUD's copy (g_scr_sp_zombietron.h)
+    }
 }
 
 const BuiltinFunctionDef g_sp_zombietron_functions[] =

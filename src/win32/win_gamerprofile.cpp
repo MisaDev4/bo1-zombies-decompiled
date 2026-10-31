@@ -226,10 +226,8 @@ void __cdecl GamerProfile_UpdateDvarsFromProfile(int controllerIndex)
         Dvar_SetInt((dvar_s *)com_first_time, gamerSettings[controllerIndex].firstTime);
         // zombies: SP 0x0061F665..0x0061F6B8 ORs in the _override dvars (1 by default on PC), registered only
         // with bo1_zombies; MP (no override dvars) takes the profile value as before.
-        // menu-1: deliberate deviation (user): with bo1_zombies Dead Ops Arcade stays hidden whatever the profile says.
-        Dvar_SetBool((dvar_s *)zombietron_discovered, !(bo1_zombies && bo1_zombies->current.enabled)
-            && (gamerSettings[controllerIndex].zombietron_discovered
-                || (zombietron_discovered_override && zombietron_discovered_override->current.enabled)));
+        Dvar_SetBool((dvar_s *)zombietron_discovered, gamerSettings[controllerIndex].zombietron_discovered
+            || (zombietron_discovered_override && zombietron_discovered_override->current.enabled));
         Dvar_SetBool((dvar_s *)zombiefive_discovered, gamerSettings[controllerIndex].zombiefive_discovered
             || (zombiefive_discovered_override && zombiefive_discovered_override->current.enabled));
         Dvar_SetBool((dvar_s *)gpad_enabled, gamerSettings[controllerIndex].gpadEnabled);
@@ -392,8 +390,7 @@ void __cdecl GamerProfile_UpdateProfileFromDvars(int controllerIndex, profileWri
         CL_ClearKeys(localClientNum);
     }
     gamerSettings[controllerIndex].firstTime = com_first_time->current.integer;
-    if ( !bo1_zombies || !bo1_zombies->current.enabled ) // menu-1: the forced 0 above is not saved into the profile
-        gamerSettings[controllerIndex].zombietron_discovered = zombietron_discovered->current.enabled;
+    gamerSettings[controllerIndex].zombietron_discovered = zombietron_discovered->current.enabled;
     gamerSettings[controllerIndex].zombiefive_discovered = zombiefive_discovered->current.enabled;
     gamerSettings[controllerIndex].gpadEnabled = gpad_enabled->current.enabled;
     gamerSettings[controllerIndex].invertPitch = input_invertPitch->current.enabled;

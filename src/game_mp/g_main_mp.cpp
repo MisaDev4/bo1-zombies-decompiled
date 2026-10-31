@@ -1,6 +1,7 @@
 #include <qcommon/cm_mapkit.h>
 #include <universal/profile.h>
 #include <algorithm>
+#include <game_sp/g_scr_sp_zombietron.h>
 #include <windows.h>
 #include <dbghelp.h>
 #include <clientscript/cscr_compiler.h>
@@ -3918,13 +3919,15 @@ int G_PopulateMatchState()
     // scripts' `attacker.headshots++` in maps/_gameskill). BO1Zombies's MP clientState has no such field, so in
     // zombiemode the headshots go to the client through the MP scoreboard-column transport (KB transport,
     // not the SP wire format). Scripts that set their own columns (setscoreboardcolumns) are left alone.
+    // On zombietron the other columns carry the HUD's boosters, lives and score multiplier (g_scr_sp_zombietron.h).
     if ( zombiemode && zombiemode->current.enabled
         && level.matchState.unarchivedState.scoreboardColumnTypes[0] == SB_TYPE_INVALID )
     {
+        const bool zt = zombietron && zombietron->current.enabled;
         level.matchState.unarchivedState.scoreboardColumnTypes[0] = SB_TYPE_HEADSHOTS;
-        level.matchState.unarchivedState.scoreboardColumnTypes[1] = SB_TYPE_NONE;
-        level.matchState.unarchivedState.scoreboardColumnTypes[2] = SB_TYPE_NONE;
-        level.matchState.unarchivedState.scoreboardColumnTypes[3] = SB_TYPE_NONE;
+        level.matchState.unarchivedState.scoreboardColumnTypes[1] = zt ? SB_ZT_BOOSTERS : SB_TYPE_NONE;
+        level.matchState.unarchivedState.scoreboardColumnTypes[2] = zt ? SB_ZT_LIVES : SB_TYPE_NONE;
+        level.matchState.unarchivedState.scoreboardColumnTypes[3] = zt ? SB_ZT_MULTIPLIER : SB_TYPE_NONE;
     }
     return result;
 }

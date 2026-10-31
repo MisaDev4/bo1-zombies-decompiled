@@ -1526,6 +1526,10 @@ void __cdecl CG_CopyScoreFromClientState(int localClientNum, clientInfo_t *ci, c
         ci->score.place = cs->score.place;
         ci->score.score = cs->score.score;
         ci->score.deaths = cs->score.deaths;
+        // zombies: score.assists is networked but KB's copy leaves it out; zombietron's HUD shows the bombs in it
+        // (SP score+0x14, _zombietron_score::update_hud).
+        if ( zombiemode && zombiemode->current.enabled )
+            ci->score.assists = cs->score.assists;
         for ( column = 0; column < 4; ++column )
             ci->score.scoreboardColumns[column] = cs->score.scoreboardColumns[column];
         if ( ci->score.status_icon != cs->score.status_icon )

@@ -5,6 +5,10 @@ struct rectDef_s;
 void CG_SP_RegisterScoreBarDvars();
 void CG_SP_SetupScoreboardDvars();
 bool CG_SP_OwnerDraw_MiniScoreboard(int localClientNum, const rectDef_s *rect);
+bool CG_SP_OwnerDraw_ZombietronScores(int localClientNum, const rectDef_s *rect); // ownerdraw 354
+void CG_SP_ResetZombietronHud(int localClientNum);
+void CG_SP_RegisterObjectiveIndicatorDvars();
+void CG_SP_DrawObjectiveIndicators(int localClientNum); // ownerdraw 322
 int CG_SP_DrawScoreboard(int localClientNum);
 void CG_SP_DrawIntermission(int localClientNum);
 extern const struct dvar_s *cg_defaultFadeScreenColor; // SP 0x02FF67E8

@@ -1,5 +1,6 @@
 #include <sound/snd_bo1_trace.h>
 #include <game_sp/g_sp_vision.h>
+#include <game_sp/g_scr_sp_zombietron.h>
 #include <game_sp/g_sp_testplan.h>
 #include <game_sp/g_sp_headless_dice.h>
 #include "g_scr_main_mp.h"
@@ -5282,18 +5283,27 @@ void Scr_Objective_Add()
         Scr_ParamError(1u, v2, SCRIPTINSTANCE_SERVER);
     }
     obj->state = state;
-    // zombies: SP objective_add (SP 0x007f6c10 -> 0x007f6700) is ( index, state, [text], [position] ): the text
-    // goes to SP's objective configstring (0x142 + index; not ported, see Objective_String in
-    // g_scr_sp_zombietron.cpp) and the position comes from param 3. SP has no icon parameter.
+    // zombies: SP objective_add (SP 0x007f6c10 -> 0x007f6700) is ( index, state, [text], [position or entity] ),
+    // with no icon. It turns the objective's 3D marker off (use3D and the 3D text, SP +0x24 / +0x2c; Objective_Set3D
+    // in g_scr_sp_zombietron.cpp sets them). NOT PORTED: the text, which SP puts in its objective configstring
+    // (0x142 + index) for the objectives list; the port has no SP objectives list.
     if ( G_SP_IsSPLevel() )
     {
+        obj->use3D = 0;
+        G_SP_SetObjective3DText(obj, 0);
         if ( numParam >= 4 )
         {
-            Scr_GetVector(3u, obj->origin, SCRIPTINSTANCE_SERVER);
-            obj->origin[0] = (float)(int)obj->origin[0];
-            obj->origin[1] = (float)(int)obj->origin[1];
-            obj->origin[2] = (float)(int)obj->origin[2];
-            obj->entNum = 1023;
+            if ( Scr_GetType(3u, SCRIPTINSTANCE_SERVER) == VAR_VECTOR )
+            {
+                Scr_GetVector(3u, obj->origin, SCRIPTINSTANCE_SERVER);
+            }
+            else
+            {
+                // SP stores the entity number (its "ent0" key); flagged like objective_onentity so it is sent
+                gentity_s *ent = Scr_GetEntity(3u);
+                obj->entNum = ent->s.number;
+                ent->r.svFlags |= 0x10u;
+            }
         }
         obj->teamNum = 0;
         return;

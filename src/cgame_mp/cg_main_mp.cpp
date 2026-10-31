@@ -470,6 +470,11 @@ void __cdecl CG_RegisterDvars()
     // zombies: SP 0x004A65D1 registers hud_missionFailed (bool 0, flags 0x1000, no description) in the same
     // function; _callbacksetup::CodeCallback_PlayerKilled SetSavedDvar()s it and threw without it.
     _Dvar_RegisterBool("hud_missionFailed", 0, 0x1000u, "");
+    // zombies: SP 0x004A5705 registers cl_scoreDraw (int 1 in [0, 1], flags 0, no description) in the same
+    // function. The zombietron HUD (ownerdraw 354, SP 0x0041fb80) draws only while it is set; DOA's
+    // end-of-game scene sets it to 0.
+    _Dvar_RegisterInt("cl_scoreDraw", 1, 0, 1, 0, "");
+    CG_SP_RegisterObjectiveIndicatorDvars(); // zombies: SP 0x004a5eb7..0x004a6589 (cg_sp_hud.cpp)
     // zombies: SP-only CG_RegisterDvars entries a Five player can notice (p1 chunk 16; SP defaults, flags, ranges,
     // no descriptions). lastStandSway*: the downed view sway (SP 0x004A6527 / 0x004A6558, read by 0x00791D20).
     // cg_drawHUD / hud_drawHUD: SP CG_Draw2DInternal (0x00655A50), CG_OwnerDrawHud (0x005ACCB0) and
@@ -2930,6 +2935,7 @@ void __cdecl CG_Init(int localClientNum, int serverMessageNum, int serverCommand
     CG_SetupSplitscreenDvars();
     if ( zombiemode && zombiemode->current.enabled )
         CG_SP_SetupScoreboardDvars(); // zombies: SP scoreboard defaults (cg_sp_hud.cpp)
+    CG_SP_ResetZombietronHud(localClientNum); // zombies: SP clears it with cg (cg+0xce514..0xce528)
     Flame_Init();
     Ragdoll_Init();
     Phys_Init();

@@ -11,9 +11,11 @@
 #include <game_mp/g_spawn_mp.h>
 #include <qcommon/common.h>
 #include <game_sp/g_sp_ext.h>
+#include <game_sp/g_scr_sp_zombietron.h>
 
 static void __cdecl ClientScr_SetSpField(gclient_s *client, const client_fields_s *field);
 static void __cdecl ClientScr_GetSpField(gclient_s *client, const client_fields_s *field);
+static void __cdecl ClientScr_SetSpScoreField(gclient_s *client, const client_fields_s *field);
 
 const char *g_scoreboardColumnNames[18] =
 {
@@ -188,9 +190,9 @@ const client_fields_s fields[] =
   // (SP row 0x00a527a8, getter 0x007d5ac0, read-only setter 0x007d59a0).
   { "playername", 0, { 0 }, F_LSTRING, 0u, ClientScr_ReadOnly, ClientScr_GetName },
   // zombies: SP +0x1ba4 -> gclientSpExt::downs (SP 0x00a527fc).
-  { "downs", offsetof(gclientSpExt, downs), { 4 }, F_INT, 0u, ClientScr_SetSpField, ClientScr_GetSpField },
+  { "downs", offsetof(gclientSpExt, downs), { 4 }, F_INT, 0u, ClientScr_SetSpScoreField, ClientScr_GetSpField },
   // zombies: SP +0x1ba8 -> gclientSpExt::revives (SP 0x00a52818).
-  { "revives", offsetof(gclientSpExt, revives), { 4 }, F_INT, 0u, ClientScr_SetSpField, ClientScr_GetSpField },
+  { "revives", offsetof(gclientSpExt, revives), { 4 }, F_INT, 0u, ClientScr_SetSpScoreField, ClientScr_GetSpField },
   // zombies: SP +0xc, mask 0x02000000 -> ps.pm_flags (SP 0x00a52850).
   { "nolean", offsetof(gclient_s, ps.pm_flags), { 4 }, F_BITFLAG, 0x02000000u, NULL, NULL },
   // zombies: SP +0xc, mask 0x10000000 -> ps.pm_flags (SP 0x00a5286c).
@@ -208,6 +210,17 @@ static void __cdecl ClientScr_SetSpField(gclient_s *client, const client_fields_
 static void __cdecl ClientScr_GetSpField(gclient_s *client, const client_fields_s *field)
 {
     GScr_GetGenericField((unsigned __int8 *)&G_ClientSpExt(client), field->type, field->ofs, field->whichbits);
+}
+
+// zombies: downs and revives also reach zombietron's HUD as scoreboard columns (SB_ZT_BOOSTERS / SB_ZT_LIVES,
+// g_scr_sp_zombietron.h); SP sends them as clientState score.downs / score.revives.
+static void __cdecl ClientScr_SetSpScoreField(gclient_s *client, const client_fields_s *field)
+{
+    ClientScr_SetSpField(client, field);
+    if (field->ofs == offsetof(gclientSpExt, downs))
+        G_SP_SetScoreColumn(client, SB_ZT_BOOSTERS, G_ClientSpExt(client).downs);
+    else
+        G_SP_SetScoreColumn(client, SB_ZT_LIVES, G_ClientSpExt(client).revives);
 }
 
 void __cdecl ClientScr_ReadOnly(gclient_s *pSelf, const client_fields_s *pField)
@@ -599,6 +612,13 @@ int __cdecl ClientScr_GetScoreboardColumnIndexByType(scoreboardColumnType_t colu
             return i;
     }
     return -1;
+}
+
+void G_SP_SetScoreColumn(gclient_s *client, scoreboardColumnType_t columnType, int value)
+{
+    const int columnIndex = ClientScr_GetScoreboardColumnIndexByType(columnType);
+    if (columnIndex >= 0)
+        client->sess.cs.score.scoreboardColumns[columnIndex] = value;
 }
 
 void ClientScr_SetDeaths(gclient_s *pSelf, const client_fields_s *__formal)
