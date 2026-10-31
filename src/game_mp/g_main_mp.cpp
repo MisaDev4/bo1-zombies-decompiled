@@ -587,6 +587,14 @@ int __cdecl G_GetClientSize()
     return 10720;
 }
 
+// zombies: false from G_InitGame's memset(&level) until it sets level.maxclients. A script compile error drops
+// the server inside that window (GScr_LoadScripts runs first), and SV_FinalMessage then builds a snapshot
+// header for the clients still connected from the previous level (the front end's local client).
+bool __cdecl G_HasClientStates()
+{
+    return level.maxclients > 0;
+}
+
 void __cdecl G_FreeEntities(bool clearTargets)
 {
     gentity_s *e; // [esp+0h] [ebp-Ch]
@@ -2396,7 +2404,8 @@ void G_PrintAllFastFileErrors()
     // Keep the build-error checks, using the SP zones selected by the zombie loader.
     G_PrintFastFileErrors(G_SP_IsSPLevel() ? (char*)"code_post_gfx" : (char*)"code_post_gfx_mp");
     // zombies: the SP front end loads no common zone (SP 0x004C8940..0x004C8966): nothing to report there.
-    if ( !Com_IsSPFrontEndRunning() )
+    // Nor does zombietron (Com_LoadCommonFastFile, SP 0x0082CB50).
+    if ( !Com_IsSPFrontEndRunning() && !(zombietron && zombietron->current.enabled) )
         G_PrintFastFileErrors(G_SP_IsSPLevel() ? (char*)"common_zombie" : (char*)"common_mp");
     G_PrintFastFileErrors((char *)sv_mapname->current.integer);
 }

@@ -2972,8 +2972,19 @@ void __cdecl SV_SetServerStaticHeader()
     svsHeader.clientArchive = sv_clientArchive->current.color[0];
     svsHeader.gentities = sv.gentities;
     svsHeader.gentitySize = sv.gentitySize;
-    svsHeader.firstClientState = G_GetClientState(0);
-    svsHeader.firstPlayerState = (playerState_s *)G_GetPlayerState(0);
+    // zombies: no client states while G_InitGame has not set them up (G_HasClientStates). KB stores
+    // &level.clients[0] there (its retail build has no asserts); the header then has none, and no client is
+    // active to have its state written.
+    if (G_HasClientStates())
+    {
+        svsHeader.firstClientState = G_GetClientState(0);
+        svsHeader.firstPlayerState = (playerState_s *)G_GetPlayerState(0);
+    }
+    else
+    {
+        svsHeader.firstClientState = nullptr;
+        svsHeader.firstPlayerState = nullptr;
+    }
     svsHeader.clientSize = G_GetClientSize();
     svsHeader.matchState = G_GetMatchState();
     svsHeaderValid = 1;
@@ -3235,7 +3246,7 @@ void __cdecl SV_GetServerStaticHeader()
     }
     iassert(svsHeader.gentities == sv.gentities);
     iassert(svsHeader.gentitySize == sv.gentitySize);
-    if ( svsHeader.firstClientState != G_GetClientState(0)
+    if ( svsHeader.firstClientState != (G_HasClientStates() ? G_GetClientState(0) : nullptr)
         && !Assert_MyHandler(
                     "C:\\projects_pc\\cod\\codsrc\\src\\server_mp\\sv_snapshot_mp.cpp",
                     3611,
@@ -3245,7 +3256,7 @@ void __cdecl SV_GetServerStaticHeader()
     {
         __debugbreak();
     }
-    if ( (gclient_s *)svsHeader.firstPlayerState != G_GetPlayerState(0)
+    if ( (gclient_s *)svsHeader.firstPlayerState != (G_HasClientStates() ? G_GetPlayerState(0) : nullptr)
         && !Assert_MyHandler(
                     "C:\\projects_pc\\cod\\codsrc\\src\\server_mp\\sv_snapshot_mp.cpp",
                     3612,

@@ -923,6 +923,8 @@ set(SRC_GAME_SP
 	"${SRC_DIR}/game_sp/g_scr_sp_players.cpp"
 	"${SRC_DIR}/game_sp/g_scr_sp_players_x1.cpp"
 	"${SRC_DIR}/game_sp/g_scr_sp_players_x1.h"
+	"${SRC_DIR}/game_sp/g_scr_sp_zombietron.cpp"
+	"${SRC_DIR}/game_sp/g_scr_sp_zombietron.h"
 	"${SRC_DIR}/game_sp/g_sp_levelstart.cpp"
 	"${SRC_DIR}/game_sp/g_sp_levelstart.h"
 	"${SRC_DIR}/game_sp/g_sp_client.cpp"

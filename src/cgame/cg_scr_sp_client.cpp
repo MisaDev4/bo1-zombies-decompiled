@@ -1173,6 +1173,29 @@ static void __cdecl CScr_GiveGamerPicture()
 {
 }
 
+// zombies: ShowScores( localClientNum ) / HideScores( localClientNum ) (SP 0x00894720 / 0x00894790, zombietron's
+// client script). Both set cg.showScores (SP cg+0xa9b38) on SP's one cgame global whatever the index: the
+// bad-index error does not return.
+static void CScr_SetShowScores(int show, const char *paramsError)
+{
+    if (Scr_GetNumParam(SCRIPTINSTANCE_CLIENT) != 1)
+        Scr_Error(SCRIPTINSTANCE_CLIENT, paramsError, 0);
+    int localClientNum = Scr_GetInt(0, SCRIPTINSTANCE_CLIENT);
+    if (localClientNum < 0 || localClientNum >= 1)
+        Scr_Error(SCRIPTINSTANCE_CLIENT, va("Trying to get a local client index for a client '%d' that is not a local client.", localClientNum), 0);
+    CG_GetLocalClientGlobals(0)->showScores = show;
+}
+
+static void __cdecl CScr_ShowScores()
+{
+    CScr_SetShowScores(1, "ShowScores() called with wrong params.\n");
+}
+
+static void __cdecl CScr_HideScores()
+{
+    CScr_SetShowScores(0, "HideScores() called with wrong params.\n");
+}
+
 const BuiltinFunctionDef g_csp_client_functions[] =
 {
     { "setsunlight", CScr_SetSunLight, 0 },
@@ -1203,6 +1226,8 @@ const BuiltinFunctionDef g_csp_client_functions[] =
     { "updatedvarsfromprofile", CScr_UpdateDvarsFromProfile, 0 },
     { "setcollectible", CScr_SetCollectible, 0 },
     { "givegamerpicture", CScr_GiveGamerPicture, 0 },
+    { "showscores", CScr_ShowScores, 0 },
+    { "hidescores", CScr_HideScores, 0 },
     { nullptr, nullptr, 0 } // end marker, keep last
 };
 const unsigned int g_csp_client_function_count = ARRAY_COUNT(g_csp_client_functions) - 1;

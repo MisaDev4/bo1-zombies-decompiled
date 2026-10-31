@@ -1034,6 +1034,10 @@ void __cdecl SV_Init()
                                                         1,
                                                         0x100u,
                                                         "If true, vehicles will be predicted on the client reducing response time");
+    // zombies: SP registers it right after sv_clientSideVehicles (SP 0x0069856A: bool 0, flags 0x1000, no
+    // description); zombietron's init_dvars SetSavedDvar()s it to 1 and threw without it. NOT PORTED: its SP
+    // readers (SP 0x005A8224, 0x005DD58A), which cut back temp entities while it is set.
+    _Dvar_RegisterBool("sv_restrictedTempEnts", 0, 0x1000u, "");
     sv_penetrationCount = _Dvar_RegisterInt(
                                                     "penetrationCount",
                                                     5,

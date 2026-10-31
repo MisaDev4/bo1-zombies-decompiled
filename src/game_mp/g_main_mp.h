@@ -362,6 +362,7 @@ MatchState *__cdecl G_GetMatchState();
 clientState_s *__cdecl G_GetClientState(unsigned int clientNum);
 gclient_s *__cdecl G_GetPlayerState(unsigned int clientNum);
 int __cdecl G_GetClientSize();
+bool __cdecl G_HasClientStates();
 void __cdecl G_FreeEntities(bool clearTargets);
 void *__cdecl Hunk_AllocXAnimServer(unsigned int size);
 bool __cdecl G_ExitAfterConnectPaths();

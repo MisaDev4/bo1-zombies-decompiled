@@ -5282,6 +5282,22 @@ void Scr_Objective_Add()
         Scr_ParamError(1u, v2, SCRIPTINSTANCE_SERVER);
     }
     obj->state = state;
+    // zombies: SP objective_add (SP 0x007f6c10 -> 0x007f6700) is ( index, state, [text], [position] ): the text
+    // goes to SP's objective configstring (0x142 + index; not ported, see Objective_String in
+    // g_scr_sp_zombietron.cpp) and the position comes from param 3. SP has no icon parameter.
+    if ( G_SP_IsSPLevel() )
+    {
+        if ( numParam >= 4 )
+        {
+            Scr_GetVector(3u, obj->origin, SCRIPTINSTANCE_SERVER);
+            obj->origin[0] = (float)(int)obj->origin[0];
+            obj->origin[1] = (float)(int)obj->origin[1];
+            obj->origin[2] = (float)(int)obj->origin[2];
+            obj->entNum = 1023;
+        }
+        obj->teamNum = 0;
+        return;
+    }
     if ( numParam >= 3 )
     {
         Scr_GetVector(2u, obj->origin, SCRIPTINSTANCE_SERVER);
@@ -6802,6 +6818,40 @@ void __cdecl Scr_SightTracePassed()
 
 const int scriptMaskToPhysicsMask[3] = { 42003603, 529, 32 };
 
+// zombies: SP PhysicsTrace( start, end, [mins], [maxs] ) (SP 0x007f8560) returns the end position as a vector, not
+// KB's result array: a capsule trace with SP's fixed mask 0x820011 and no ignore entity. SP's 5-parameter case
+// reads its ignore entity from parameter index 5, which a 5-parameter call does not have; the port ignores none.
+// DOA (_zombietron_scenes) and common_zombie's animscripts (combat_utility, revive) use the vector.
+static void Scr_PhysicsTrace_SP()
+{
+    float start[3], end[3];
+    float mins[3] = { 0.0f, 0.0f, 0.0f };
+    float maxs[3] = { 0.0f, 0.0f, 0.0f };
+    switch ( Scr_GetNumParam(SCRIPTINSTANCE_SERVER) )
+    {
+        case 5:
+        case 4:
+            Scr_GetVector(3u, maxs, SCRIPTINSTANCE_SERVER);
+            [[fallthrough]];
+        case 3:
+            Scr_GetVector(2u, mins, SCRIPTINSTANCE_SERVER);
+            [[fallthrough]];
+        case 2:
+            Scr_GetVector(0, start, SCRIPTINSTANCE_SERVER);
+            Scr_GetVector(1u, end, SCRIPTINSTANCE_SERVER);
+            break;
+        default:
+            Scr_Error("illegal call to PhysicsTrace()", 0);
+            return;
+    }
+    col_context_t context;
+    trace_t trace;
+    G_TraceCapsule(&trace, start, mins, maxs, end, ENTITYNUM_NONE, 0x820011, &context);
+    float endpos[3];
+    Vec3Lerp(start, end, trace.fraction, endpos);
+    Scr_AddVector(endpos, SCRIPTINSTANCE_SERVER);
+}
+
 void Scr_PhysicsTrace()
 {
     char *v0; // eax
@@ -6821,6 +6871,11 @@ void Scr_PhysicsTrace()
     int iSurfaceTypeIndex; // [esp+D8h] [ebp-8h]
     unsigned __int16 hitEntId; // [esp+DCh] [ebp-4h]
 
+    if ( G_SP_IsSPLevel() )
+    {
+        Scr_PhysicsTrace_SP();
+        return;
+    }
     maskType = 1;
     pIgnoreEnt = 0;
     iIgnoreEntNum = 1023;
