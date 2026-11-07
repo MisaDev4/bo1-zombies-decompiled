@@ -25,7 +25,14 @@ void G_SP_RegisterHordeDvars()
 
     // drops
     _Dvar_RegisterInt("horde_perk_drop", 15, 0, 100, 0,
-        "horde mod: percent of the regular power-up drops that become a free-perk bottle (0 = off, retail); ignored with noperks");
+        "horde mod: percent of the zombie power-up drops that are a free-perk bottle (100 = all of them, 0 = off, retail); approximate between; ignored with noperks");
+
+    _Dvar_RegisterInt("horde_drop_max", -1, -1, 1000, 0,
+        "horde mod: most power-up drops per round (retail 4); 0 = none, -1 = retail");
+    _Dvar_RegisterInt("horde_drop_step", -1, -1, 10000000, 0,
+        "horde mod: team score between power-up drops, the first gap (retail 2000); -1 = retail");
+    _Dvar_RegisterFloat("horde_drop_growth", -1.0f, -1.0f, 100.0f, 0,
+        "horde mod: what the score gap between drops is multiplied by after each drop (retail 1.14; 1 = always the same gap); -1 = retail");
 
     // big crowds
     _Dvar_RegisterInt("horde_unjam", 1, 0, 1, 0,

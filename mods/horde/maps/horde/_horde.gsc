@@ -74,6 +74,8 @@ main_end()
 	maps\horde\_horde_unjam::init();
 	// mod: horde_perk_drop N (default 15): percent of the regular power-up drops that become a free-perk bottle
 	maps\horde\_horde_perks::init();
+	// mod: horde_drop_max / horde_drop_step / horde_drop_growth (default -1 = retail): how often zombies drop power-ups
+	maps\horde\_horde_drops::init();
 	// mod (L45): horde_spawn_all 0/1 (default 0 = retail spawn list); manage_zones calls this once a second
 	if ( GetDvar( #"horde_spawn_all" ) == "" )
 	{
