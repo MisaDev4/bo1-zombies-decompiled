@@ -37,6 +37,13 @@ the entity limit") instead of ending the map, so a higher `horde_max_zombies` is
 
 ## Other dvars
 
+- `horde_perk_drop N` (default 15) - percent of the regular power-up drops that become a free-perk bottle, the one
+  Call of the Dead's George drops (retail never lets a zombie kill pick it). Grabbing it gives every living player one
+  perk they don't have yet, from the machines of the map. Only the plain drops are swapped (nuke, insta-kill, double
+  points, max ammo, carpenter, fire sale, revive all), and only while somebody still lacks a perk. 0 = retail. Can be
+  changed while playing; ignored with `noperks`. Logged as `horde_perk: drop <old> -> free_perk` in games_mp.log.
+  (`maps/horde/_horde_perks.gsc`; `main_start` in `_horde.gsc` includes the power-up before the retail power-up init so its
+  model is loaded. `horde_perk_test 1` is a test aid that drops one and logs the perk count before and after.)
 - `horde_tough 1` - a test aid: players get 100000 health, refilled every half second, so the horde can grow.
 - `zinfo 1` (default) - while you hold Tab, the zombies alive and the zombies left this round show beside the
   scoreboard (`zinfo 0` hides them). The same counter without horde rules: `mods/zinfo`.

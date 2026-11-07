@@ -17,6 +17,9 @@
 
 main_start()
 {
+	// the free-perk bottle (maps\horde\_horde_perks): add_zombie_powerup only registers and precaches what is included
+	// before init_powerups. Runs from Five's ffotd hook and from the shared _zombiemode_ffotd one (_hooks.gsc); twice is fine
+	maps\_zombiemode_powerups::include_zombie_powerup( "free_perk" );
 }
 
 
@@ -69,6 +72,8 @@ main_end()
 	maps\horde\_horde_windows::init();
 	// mod (L52): horde_unjam 0/1 (default 1): a zombie stuck in the crowd loses zombie-vs-zombie collision for 1.5 s
 	maps\horde\_horde_unjam::init();
+	// mod: horde_perk_drop N (default 15): percent of the regular power-up drops that become a free-perk bottle
+	maps\horde\_horde_perks::init();
 	// mod (L45): horde_spawn_all 0/1 (default 0 = retail spawn list); manage_zones calls this once a second
 	if ( GetDvar( #"horde_spawn_all" ) == "" )
 	{
