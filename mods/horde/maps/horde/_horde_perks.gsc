@@ -43,47 +43,78 @@ horde_perk_drop_think()
 {
 	level endon( "end_game" );
 	flag_wait( "all_players_spawned" );
-	last_key = -1;
+	// powerup_drop adds 1 to level.powerup_drop_count before it waits for its entity, and notifies after: with several
+	// zombies killed in one frame (a nuke, a crowd) the count is already 2+ when the first notify arrives. So a notify is a
+	// regular drop while fewer notifies have been counted ("done") than the count says; specific_powerup_drop never
+	// changes the count. A refused drop takes its 1 back, a new round resets it (done follows it down).
+	done = 0;
 	swapped = 0;
 	regular = 0;
 	for ( ;; )
 	{
 		level waittill( "powerup_dropped", powerup );
-		// powerup_drop counts the drop (level.powerup_drop_count, reset every round) before it notifies; a drop made by
-		// specific_powerup_drop leaves the count alone
-		key = level.round_number * 1000 + level.powerup_drop_count;
-		if ( key == last_key )
+		count = 0;
+		if ( IsDefined( level.powerup_drop_count ) )
 		{
-			continue;
+			count = level.powerup_drop_count;
 		}
-		last_key = key;
+		if ( done > count )
+		{
+			done = count;
+		}
+		if ( done >= count )
+		{
+			continue;	// not counted by powerup_drop: made on purpose by a script (George, the thief, a sandbox pad)
+		}
+		done++;
 		regular++;
 		if ( !IsDefined( powerup ) || !IsDefined( powerup.powerup_name ) )
 		{
 			continue;
 		}
-		chance = GetDvarInt( #"horde_perk_drop" );
-		if ( chance <= 0 || GetDvarInt( #"noperks" ) != 0 )
-		{
-			continue;
-		}
-		if ( !IsDefined( level.zombie_powerups ) || !IsDefined( level.zombie_powerups["free_perk"] ) )
-		{
-			continue;
-		}
-		if ( !horde_perk_swappable( powerup.powerup_name ) || !horde_perk_wanted() )
-		{
-			continue;
-		}
-		if ( RandomInt( 100 ) >= chance )
-		{
-			continue;
-		}
 		old = powerup.powerup_name;
+		chance = GetDvarInt( #"horde_perk_drop" );
+		why = horde_perk_refused( old, chance );
+		if ( why == "" && RandomInt( 100 ) >= chance )
+		{
+			why = "chance " + chance;
+		}
+		if ( why != "" )
+		{
+			horde_perk_log( "drop " + old + " kept (" + why + ")" );
+			continue;
+		}
 		horde_perk_swap( powerup );
 		swapped++;
 		horde_perk_log( "drop " + old + " -> free_perk (" + swapped + " of " + regular + " regular drops)" );
 	}
+}
+
+
+// "" = this drop may become a bottle, else the reason it stays what it is
+horde_perk_refused( name, chance )
+{
+	if ( chance <= 0 )
+	{
+		return "horde_perk_drop 0";
+	}
+	if ( GetDvarInt( #"noperks" ) != 0 )
+	{
+		return "noperks";
+	}
+	if ( !IsDefined( level.zombie_powerups ) || !IsDefined( level.zombie_powerups["free_perk"] ) )
+	{
+		return "free_perk not registered";
+	}
+	if ( !horde_perk_swappable( name ) )
+	{
+		return "not a plain power-up";
+	}
+	if ( !horde_perk_wanted() )
+	{
+		return "everybody has every perk";
+	}
+	return "";
 }
 
 
