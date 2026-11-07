@@ -149,10 +149,31 @@ void __cdecl CG_Viewpos_f()
             cgameGlob->refdefViewAngles[0]);
 }
 
+// zombies: the scoreboard is CG_SP_DrawScoreboard, drawn from cg.showScores alone; there is no "scoreboard" menu in
+// the SP zones. The MP path below makes the scoreboard the active UI menu, which sets the UI key catcher with no
+// menu focused: the next key event that reaches UI_KeyEvent (the autorepeat char of a held move key, say) then finds
+// no focus and calls Key_ClearStates, which sends "-forward" etc. for every held key and stops the player. So in
+// zombies +scores / -scores only set cg.showScores and leave the UI and the key catchers alone.
+static bool CG_ScoresAreSPHud()
+{
+    return zombiemode && zombiemode->current.enabled;
+}
+
 void __cdecl CG_ScoresUp_f()
 {
     if ( CG_GetLocalClientGlobals(0)->nextSnap )
     {
+        if ( CG_ScoresAreSPHud() )
+        {
+            cg_s *cgameGlob = CG_GetLocalClientGlobals(0);
+            if ( cgameGlob->showScores )
+            {
+                cgameGlob->showScores = 0;
+                cgameGlob->scoresTop = -1;
+                cgameGlob->scoreFadeTime = cgameGlob->physicsTime; // CG_SP_DrawScoreboard fades on physicsTime
+            }
+            return;
+        }
         CG_ScoresUp(0);
         if ( UI_GetActiveMenu(0) == UIMENU_SCOREBOARD )
             UI_SetActiveMenu(0, UIMENU_NONE);
@@ -164,6 +185,8 @@ void __cdecl CG_ScoresDown_f()
     if ( CG_GetLocalClientGlobals(0)->nextSnap )
     {
         CG_ScoresDown(0);
+        if ( CG_ScoresAreSPHud() )
+            return;
         if ( UI_GetActiveMenu(0) != UIMENU_SCOREBOARD )
             UI_SetActiveMenu(0, UIMENU_SCOREBOARD);
     }
