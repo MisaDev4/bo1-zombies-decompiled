@@ -944,6 +944,8 @@ set(SRC_GAME_SP
 	"${SRC_DIR}/game_sp/g_sp_vision.h"
 	"${SRC_DIR}/game_sp/g_sp_measure.cpp"
 	"${SRC_DIR}/game_sp/g_sp_measure.h"
+	"${SRC_DIR}/game_sp/g_sp_horde_dvars.cpp"
+	"${SRC_DIR}/game_sp/g_sp_horde_dvars.h"
 	"${SRC_DIR}/game_sp/g_sp_playtrace.cpp"
 	"${SRC_DIR}/game_sp/g_sp_playtrace.h"
 	"${SRC_DIR}/game_sp/scr_sp_debug.cpp"

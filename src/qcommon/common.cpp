@@ -93,6 +93,7 @@
 #include <devgui/devgui.h>
 #include <game_sp/g_sp_savegame.h>
 #include <game_sp/g_sp_measure.h>
+#include <game_sp/g_sp_horde_dvars.h>
 #include <cgame/cg_sp_playtrace.h>
 #include <bgame/bg_misc.h>
 
@@ -2381,6 +2382,7 @@ void Com_InitDvars()
         "mod: hybrid CPUs: 1 = server thread on P-cores + above-normal priority, 2 = also the client threads; no-op on non-hybrid CPUs");
     bo1_mod_priority = _Dvar_RegisterInt("bo1_mod_priority", 0, 0, 2, 0,
         "mod: 1 = process priority class above normal + main thread above normal, 2 = high class; 0 = as started");
+    G_SP_RegisterHordeDvars(); // mod: descriptions for the horde mod's dvars (console)
     CpuCount = Sys_GetCpuCount();
     sys_smp_allowed = _Dvar_RegisterBool("sys_smp_allowed", CpuCount > 1, 0x10u, "Allow multi-threading");
 #ifdef _DEBUG
