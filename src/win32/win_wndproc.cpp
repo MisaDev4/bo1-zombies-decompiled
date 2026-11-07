@@ -342,6 +342,11 @@ int __stdcall MainWndProc(HWND__ *hWnd, UINT uMsg, signed int wParam, LPARAM lPa
                     Sys_QueEvent(g_msgTime, SE_CHAR, wParam, 0, 0, 0);
                     return DefWindowProcA(hWnd, uMsg, wParam, lParam);
                 case 0x104u:
+                    // Alt+F4: the game takes every other WM_SYSKEYDOWN as a key and never lets DefWindowProc see it,
+                    // so Windows never turned Alt+F4 into SC_CLOSE. DefWindowProc sends WM_SYSCOMMAND SC_CLOSE, then
+                    // WM_CLOSE, which quits like the window's close button (case 0x10 below).
+                    if ( wParam == VK_F4 && (lParam & (1 << 29)) != 0 )
+                        return DefWindowProcA(hWnd, uMsg, wParam, lParam);
                     if ( wParam != 13 )
                         goto LABEL_60;
                     if ( CL_GetLocalClientConnectionState(0) == 8 )
