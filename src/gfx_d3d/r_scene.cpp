@@ -677,10 +677,15 @@ static inline float SRGBToLinear(float c)
 }
 
 // aislop
+// BO1FIX: radius is a float (the symbol is R_AddOmniLightToScene(float const *, float const (*)[3], float, float,
+// float, float); the decompile typed it int and moved it as raw bits). This rewrite took it as a real int and clamped
+// with (float)r_dlightMax*ScreenRadius->current.integer, i.e. the float dvar's bits as a number: 200.0 -> 1128792064.
+// Every FX light over 200 units got a ~1.1e9 radius and lit everything in view, e.g. Der Riese's flickering teal
+// transformer spark lights washed the whole spawn yard green.
 void __cdecl R_AddOmniLightToScene(
     const float *org,
     const float (*axis)[3],
-    int radius,
+    float radius,
     float r,
     float g,
     float b)
@@ -705,7 +710,7 @@ void __cdecl R_AddOmniLightToScene(
         }
     }
 
-    if (radius <= 0)
+    if (radius <= 0.0f)
         return;
 
     if (scene.addedLightCount >= 32)
@@ -715,20 +720,9 @@ void __cdecl R_AddOmniLightToScene(
     }
 
     /* clamp radius based on fullscreen state */
-    if (rg.isNotRenderingFullScreen)
-    {
-        clampedRadius =
-            (radius > r_dlightMaxNonFullScreenRadius->current.value)
-            ? (float)r_dlightMaxNonFullScreenRadius->current.integer
-            : (float)radius;
-    }
-    else
-    {
-        clampedRadius =
-            (radius > r_dlightMaxFullScreenRadius->current.value)
-            ? (float)r_dlightMaxFullScreenRadius->current.integer
-            : (float)radius;
-    }
+    const float maxRadius = rg.isNotRenderingFullScreen ? r_dlightMaxNonFullScreenRadius->current.value
+                                                        : r_dlightMaxFullScreenRadius->current.value;
+    clampedRadius = radius > maxRadius ? maxRadius : radius;
 
     /* try to merge with existing omni light */
     for (i = 0; i < scene.addedLightCount; ++i)
