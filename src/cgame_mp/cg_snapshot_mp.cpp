@@ -409,6 +409,17 @@ void __cdecl CG_TransitionSnapshot(int localClientNum)
         centa = CG_GetEntity(localClientNum, cgameGlob->nextSnap->entities[ic].number);
         memcpy(&centa->currentState, &centa->nextState.lerp, sizeof(centa->currentState));
     }
+    // zombies: SP's transition tail (0x00639E20, loop at 0x0063A154) then does the same for every in-use client-script
+    // light. CSC lights are not in snapshots, and makeLight's setters (setlightintensity/color/radius/fov/exponent)
+    // write nextState only, so without this currentState kept the makeLight value forever and CG_PrimaryLight lerped
+    // from it to the script's value on every snapshot: Kino's lamps and lobby banner strobed bright -> dark.
+    static_assert(sizeof(LerpEntityState) == 0x1D * 4, "SP copies 0x1D dwords");
+    for ( int fi = 0; fi < 512; ++fi )
+    {
+        fcent = &cg_fakeEntitiesArray[512 * localClientNum + fi];
+        if ( cg_fakeEntitiesInuseArray[512 * localClientNum + fi] && fcent->cent.nextState.eType == ET_PRIMARY_LIGHT )
+            memcpy(&fcent->cent.currentState, &fcent->cent.nextState.lerp, sizeof(fcent->cent.currentState));
+    }
 }
 
 void __cdecl CG_SetNextSnap(int localClientNum, snapshot_s *snap)
