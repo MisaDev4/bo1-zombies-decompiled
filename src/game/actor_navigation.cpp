@@ -6583,7 +6583,8 @@ double  CustomSearchInfo_FindPathWithWidth::EvaluateHeuristic(
     pSuccessor->transient.costFactor = factor;
 
     // Return 2D distance to goal multiplied by the factor
-    return Vec2Length(&dx) * factor;
+    const float delta[2] = { dx, dy };
+    return Vec2Length(delta) * factor;
 }
 
 double __thiscall CustomSearchInfo_FindPathWithLOS::EvaluateHeuristic(

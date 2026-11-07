@@ -1311,7 +1311,7 @@ unsigned int __cdecl FX_SpawnEffect(
         // Absolute dynamic entity case
 
         bolt.absDynEntId = boneIndex & 0x1FFFFF;
-        bolt._type = 1; // matches 0x40000000
+        bolt._type = 2; // matches 0x40000000
 
         iassert(bolt.absDynEntId == static_cast<uint32_t>(boneIndex));
     }

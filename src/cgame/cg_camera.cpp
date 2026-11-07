@@ -1687,7 +1687,7 @@ void __cdecl CG_CalcVehicleViewValues(int localClientNum)
                 if (cg_thirdPersonRange->current.value > -offsetVec[0])
                 {
                     //LODWORD(offsetVec[0]) = cg_thirdPersonRange->current.integer ^ _mask__NegFloat_;
-                    offsetVec[0] = -cg_thirdPersonRange->current.integer;
+                    offsetVec[0] = -cg_thirdPersonRange->current.value;
                 }
             }
             if ( info->thirdPersonCameraSpringDistance > 0.0
