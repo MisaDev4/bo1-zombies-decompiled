@@ -38,6 +38,7 @@
 #include "cg_newDraw_mp.h"
 #include <cgame/cg_main.h>
 #include "cg_snapshot_mp.h"
+#include <client_mp/cl_cgame_mp.h>
 #include <bgame/bg_wind.h>
 #include <cgame/cg_draw_indicators.h>
 #include <cgame/cg_bolt.h>
@@ -2150,6 +2151,118 @@ static void CG_SP_LastStandSway(cg_s *cgameGlob, CgSPClientExt *ext)
     }
 }
 
+// zombies: SP CG_CalcTopDownCamera (SP 0x00413b50), the top-down camera of Dead Ops Arcade (zombietron), called
+// from SP CG_CalcViewValues (SP 0x00794335) in place of the first-person offset. player_topDownCamMode:
+//  1, 2: follow the player at origin + player_topDownCamOffset (mode 1 keeps the player's yaw);
+//  3: frame the players: the box around client entities 0..3 grows to include player_topDownCamCenterPos, the
+//     camera backs off along its view axis by the offset and by the players' spread (zoom), and eases towards
+//     the result unless a camera tween is running;
+//  4: fixed at player_topDownCamCenterPos + player_topDownCamOffset.
+// SP reads the player position through SP 0x00572d40, which takes the vehicle's origin for a player riding one;
+// the port reads the player centity's pose origin, which a linked player shares.
+static void CG_CalcTopDownCamera(int localClientNum)
+{
+    cg_s *cgameGlob = CG_GetLocalClientGlobals(localClientNum);
+    const int mode = player_topDownCamMode->current.integer;
+    const float *camAngles = player_topDownCamAngles->current.vector;
+    if (mode == 1)
+    {
+        cgameGlob->refdefViewAngles[0] = camAngles[0];
+        cgameGlob->refdefViewAngles[1] = cgameGlob->predictedPlayerState.viewangles[1];
+        cgameGlob->refdefViewAngles[2] = 0.0f;
+    }
+    else
+    {
+        Vec3Copy(camAngles, cgameGlob->refdefViewAngles);
+    }
+    AnglesToAxis(cgameGlob->refdefViewAngles, cgameGlob->refdef.viewaxis);
+
+    const float *offset = player_topDownCamOffset->current.vector;
+    const float *centerPos = player_topDownCamCenterPos->current.vector;
+    if (mode != 3)
+    {
+        const float *base = mode == 4 ? centerPos : cgameGlob->predictedPlayerState.origin;
+        Vec3Add(base, offset, cgameGlob->refdef.vieworg);
+        return;
+    }
+
+    float mins[3], maxs[3];
+    int playerCount = 0;
+    ClearBounds(mins, maxs);
+    for (int entnum = 0; entnum < 4; ++entnum)
+    {
+        const centity_s *cent = CG_GetEntity(localClientNum, entnum);
+        if (cent->nextValid)
+        {
+            AddPointToBounds(cent->pose.origin, mins, maxs);
+            ++playerCount;
+        }
+    }
+    const float spreadX = maxs[0] - mins[0];
+    const float spreadY = maxs[1] - mins[1];
+    AddPointToBounds(centerPos, mins, maxs);
+    float center[3];
+    Vec3Add(mins, maxs, center);
+    Vec3Scale(center, 0.5f, center);
+    if (playerCount <= 1)
+    {
+        for (int i = 0; i < 3; ++i)
+            center[i] = centerPos[i] + (center[i] - centerPos[i]) * 1.4f;
+    }
+
+    const float (*axis)[3] = cgameGlob->refdef.viewaxis;
+    float org[3];
+    for (int i = 0; i < 3; ++i)
+        org[i] = center[i] - axis[0][i] * offset[2] + axis[1][i] * offset[0] + axis[2][i] * offset[1];
+
+    // zoom out with the players' spread: across the screen (y) from 200 to 1800 units (twice as fast on a 4:3
+    // window), along it (x) from 50 to 600 units, which also pulls the camera's y towards the center position
+    float zoomY = 0.0f;
+    if (fabsf(spreadY) > 200.0f)
+    {
+        zoomY = (fabsf(spreadY) - 200.0f) / (1800.0f - 200.0f);
+        int width, height;
+        float aspect;
+        CL_GetScreenDimensions(&width, &height, &aspect);
+        if (aspect == 4.0f / 3.0f)
+            zoomY *= 2.0f;
+    }
+    float zoomX = 0.0f;
+    if (fabsf(spreadX) > 50.0f)
+    {
+        zoomX = (fabsf(spreadX) - 50.0f) / (600.0f - 50.0f);
+        float pull = zoomX >= 1.0f ? 1.0f : zoomX;
+        if (-zoomX >= 0.0f)
+            pull = 0.0f;
+        org[1] += (centerPos[1] - org[1]) * pull;
+    }
+    const float zoom = zoomY >= zoomX ? zoomY : zoomX;
+    float backOff = 350.0f;
+    if (playerCount > 1)
+    {
+        backOff = 350.0f - 200.0f;
+        const float extra = zoom > 1.0f ? zoom * 200.0f : 200.0f;
+        for (int i = 0; i < 3; ++i)
+            org[i] -= axis[0][i] * extra;
+    }
+    for (int i = 0; i < 3; ++i)
+        org[i] -= axis[0][i] * (backOff * zoom);
+
+    // ease from last frame's view (CG_UpdateCameraTween keeps cameraData.lastViewOrg) unless it is a jump of
+    // 1000 units or more, or a camera tween is still running
+    const float *last = cgameGlob->cameraData.lastViewOrg;
+    float delta[3];
+    Vec3Sub(org, last, delta);
+    if (Vec3LengthSq(delta) < 1000000.0f
+        && cgameGlob->cameraData.tweenDuration <= (float)(cgameGlob->time - cgameGlob->cameraData.tweenStartTime) * 0.001f)
+    {
+        const float rate = (float)cgameGlob->frametime * 0.001f * 5.0f;
+        for (int i = 0; i < 3; ++i)
+            org[i] = last[i] + delta[i] * rate;
+    }
+    Vec3Copy(org, cgameGlob->refdef.vieworg);
+}
+
 void __cdecl CG_CalcViewValues(int localClientNum)
 {
     float v1; // [esp+4h] [ebp-8Ch]
@@ -2329,6 +2442,14 @@ void __cdecl CG_CalcViewValues(int localClientNum)
                 cgameGlob->refdef.noLodCullOut = 1;
                 CG_OffsetVehicleGunner(localClientNum, cgameGlob);
                 break;
+            case CAM_TOP_DOWN:
+                // zombies: SP CG_CalcViewValues runs the top-down camera here (SP 0x00794335, its mode 10)
+                if (zombiemode && zombiemode->current.enabled)
+                {
+                    CG_CalcTopDownCamera(localClientNum);
+                    break;
+                }
+                [[fallthrough]];
             default:
                 if (camMode != CAM_EXTRACAM && camMode != CAM_MISSILE)
                 {

@@ -372,19 +372,22 @@ void __cdecl R_AddDObjToScene(
                 {
                     frontEndDataOut->gfxEntCount = R_ModGfxEntLimit();
                     _InterlockedIncrement(&g_modRendWarn[4]);
-                    gfxEntIndex2 = 0;
+                    gfxEntIndex2 = 0; // slot 0 is the "no gfx entity" sentinel: use it, but never write to it
                 }
-                gfxEnt2 = &frontEndDataOut->gfxEnts[gfxEntIndex2];
-                frontEndDataOut->gfxEnts[gfxEntIndex2].materialTime = materialTime2;
-                if ( r_swrk_override_enable->current.enabled )
-                    v17 = r_swrk_override_characterCharredAmount->current.integer;
                 else
-                    v17 = LODWORD(burnFraction);
-                LODWORD(gfxEnt2->destructibleBurnAmount) = v17;
-                gfxEnt2->destructibleFadeAmount = 0.0f;
-                gfxEnt2->renderFxFlags = renderFxFlags;
-                gfxEnt2->wetness = wetness;
-                gfxEnt2->textureOverrideIndex = textureOverrideIndex;
+                {
+                    gfxEnt2 = &frontEndDataOut->gfxEnts[gfxEntIndex2];
+                    frontEndDataOut->gfxEnts[gfxEntIndex2].materialTime = materialTime2;
+                    if ( r_swrk_override_enable->current.enabled )
+                        v17 = r_swrk_override_characterCharredAmount->current.integer;
+                    else
+                        v17 = LODWORD(burnFraction);
+                    LODWORD(gfxEnt2->destructibleBurnAmount) = v17;
+                    gfxEnt2->destructibleFadeAmount = 0.0f;
+                    gfxEnt2->renderFxFlags = renderFxFlags;
+                    gfxEnt2->wetness = wetness;
+                    gfxEnt2->textureOverrideIndex = textureOverrideIndex;
+                }
             }
         }
         if ( dobjConstantSet && r_shader_constant_set_enable->current.enabled && R_ShaderConstantSetIsUsed(dobjConstantSet) )
@@ -677,10 +680,15 @@ static inline float SRGBToLinear(float c)
 }
 
 // aislop
+// BO1FIX: radius is a float (the symbol is R_AddOmniLightToScene(float const *, float const (*)[3], float, float,
+// float, float); the decompile typed it int and moved it as raw bits). This rewrite took it as a real int and clamped
+// with (float)r_dlightMax*ScreenRadius->current.integer, i.e. the float dvar's bits as a number: 200.0 -> 1128792064.
+// Every FX light over 200 units got a ~1.1e9 radius and lit everything in view, e.g. Der Riese's flickering teal
+// transformer spark lights washed the whole spawn yard green.
 void __cdecl R_AddOmniLightToScene(
     const float *org,
     const float (*axis)[3],
-    int radius,
+    float radius,
     float r,
     float g,
     float b)
@@ -705,7 +713,7 @@ void __cdecl R_AddOmniLightToScene(
         }
     }
 
-    if (radius <= 0)
+    if (radius <= 0.0f)
         return;
 
     if (scene.addedLightCount >= 32)
@@ -715,20 +723,9 @@ void __cdecl R_AddOmniLightToScene(
     }
 
     /* clamp radius based on fullscreen state */
-    if (rg.isNotRenderingFullScreen)
-    {
-        clampedRadius =
-            (radius > r_dlightMaxNonFullScreenRadius->current.value)
-            ? (float)r_dlightMaxNonFullScreenRadius->current.integer
-            : (float)radius;
-    }
-    else
-    {
-        clampedRadius =
-            (radius > r_dlightMaxFullScreenRadius->current.value)
-            ? (float)r_dlightMaxFullScreenRadius->current.integer
-            : (float)radius;
-    }
+    const float maxRadius = rg.isNotRenderingFullScreen ? r_dlightMaxNonFullScreenRadius->current.value
+                                                        : r_dlightMaxFullScreenRadius->current.value;
+    clampedRadius = radius > maxRadius ? maxRadius : radius;
 
     /* try to merge with existing omni light */
     for (i = 0; i < scene.addedLightCount; ++i)
@@ -4564,8 +4561,8 @@ void __cdecl R_SetBloomInfo(GfxViewInfo *viewInfo, const GfxSceneParms *scenePar
         viewInfo->bloom.bloomStreakXInnerTint[2] = r_bloomStreakXInnerTint->current.vector[2];
 
         viewInfo->bloom.bloomStreakXOuterTint[0] = r_bloomStreakXOuterTint->current.vector[0];
-        viewInfo->bloom.bloomStreakXOuterTint[0] = r_bloomStreakXOuterTint->current.vector[1];
-        viewInfo->bloom.bloomStreakXOuterTint[0] = r_bloomStreakXOuterTint->current.vector[2];
+        viewInfo->bloom.bloomStreakXOuterTint[1] = r_bloomStreakXOuterTint->current.vector[1];
+        viewInfo->bloom.bloomStreakXOuterTint[2] = r_bloomStreakXOuterTint->current.vector[2];
 
         Vec4Copy(r_bloomStreakXTintControl->current.vector, viewInfo->bloom.bloomStreakXTintControl);
 
@@ -4888,7 +4885,7 @@ void R_SetDLightsConstants(
 
     // ---- Spot-light scratch (only populated if a spot is processed) ----
     float lightAttentuation[4] = {};                          // [0]=L.attenuation[3], [1..3]=pos view-rel
-    float lightDir[3]          = {};                          // = L.attenuation[0..2]
+    float lightDir[4]          = {};                          // = L.attenuation[0..3]; uploaded as a vec4 (retail: [esp+68h..74h])
     float specularColor[3]     = {};                          // = L.diffuseColor * diffuseScale
     float lightOrigin[4]       = { 1.0f, 0.0f, 0.0f, 0.0f };  // [2..3] = spec[0..1] scaled
     float v60                  = 0.0f;                        // = spec[2] scaled
@@ -4953,6 +4950,7 @@ void R_SetDLightsConstants(
             lightDir[0] = L.attenuation[0] + 1.5287891e-5f;  // ~2^-16 epsilon
             lightDir[1] = L.attenuation[1];
             lightDir[2] = L.attenuation[2];
+            lightDir[3] = L.attenuation[3];
             lightAttentuation[0] = L.attenuation[3];
 
             lightCosHalfFovInner = L.dir[0];

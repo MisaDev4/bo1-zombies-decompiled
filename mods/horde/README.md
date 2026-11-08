@@ -20,7 +20,8 @@ The build copies `mods\` next to the exe (`build\Release\mods\horde\`). In Power
 ```powershell
 cd build\Release
 $R = (Get-Location).Path
-.\BO1Zombies.exe +set fs_b $R +set fs_h $R +set r_fullscreen 0 +set bo1_zombies 1 +set fs_game mods/horde +set fs_mods horde zinfo +set bo1_mod_maxactors 64 +set horde_max_zombies 48 +devmap zombie_pentagon
+$G = (Get-Content ..\..\gamedir.txt -TotalCount 1).Trim()   # your Black Ops install, recorded by setup.ps1
+.\BO1Zombies.exe +set fs_b $R +set fs_h $R +set fs_cdpath $G +set r_fullscreen 0 +set bo1_zombies 1 +set fs_game mods/horde +set fs_mods horde zinfo +set bo1_mod_maxactors 64 +set horde_max_zombies 48 +devmap zombie_pentagon
 ```
 
 ## More than 32 zombies
@@ -36,6 +37,23 @@ the entity limit") instead of ending the map, so a higher `horde_max_zombies` is
 
 ## Other dvars
 
+- `horde_perk_drop N` (default 15) - percent of the zombie power-up drops that are a free-perk bottle, the one Call of the
+  Dead's George drops (retail never lets a zombie kill pick it). 100 = every zombie drop, 0 = retail. Grabbing it gives every
+  living player one perk they don't have yet, from the machines of the map. Between 1 and 99 the share is approximate (the
+  bottle gets as many slots in retail's drop list as that share of the plain names needs, and retail skips carpenter / fire
+  sale / revive all / death machine at times). Drops a script makes with a name (the dog round's max ammo, the thief, George,
+  a quantum bomb) and the monkey round's are not touched. A drop is only a bottle while somebody still lacks a perk; ignored
+  with `noperks`. Can be changed while playing (type `/horde_perk_drop 100`: without the slash the console sends chat).
+  Every drop is logged as `horde_perk: drop <name>` in games_mp.log (`free_perk` = a bottle).
+  (`maps/horde/_horde_perks.gsc`: `main_start` in `_horde.gsc` includes the power-up before the retail power-up init so its
+  model is loaded. `horde_perk_test 1` is a test aid that drops one and logs the perk count before and after.)
+- `horde_drop_max N`, `horde_drop_step N`, `horde_drop_growth X` (default -1 = retail) - how often zombies drop power-ups.
+  Retail drops one whenever the team's total score has grown by a gap: the first gap is 2000 (on top of the start score),
+  then each gap is 1.14 times the last (2000, 2280, 2599, ...), and at most 4 drops per round (values from Der Riese's zombie
+  vars table). `horde_drop_step` sets the first gap, `horde_drop_growth` what it is multiplied by after each drop (1 = always
+  the same gap), `horde_drop_max` the drops per round (0 = none). Read while playing. With all three at -1 nothing is touched.
+  Logged as `horde_drop: drop N handed out, next gap G`. (`maps/horde/_horde_drops.gsc`; example for a drop every ~300 points,
+  up to 20 a round: `+set horde_drop_step 300 +set horde_drop_growth 1 +set horde_drop_max 20`.)
 - `horde_tough 1` - a test aid: players get 100000 health, refilled every half second, so the horde can grow.
 - `zinfo 1` (default) - while you hold Tab, the zombies alive and the zombies left this round show beside the
   scoreboard (`zinfo 0` hides them). The same counter without horde rules: `mods/zinfo`.

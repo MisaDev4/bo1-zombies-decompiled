@@ -2663,10 +2663,10 @@ void FX_UpdateEffectBolt(
     */
     if (bolt.type == 2)
     {
-        if (DynEnt_Valid(bolt.dobjHandle))
+        if (DynEnt_Valid((unsigned __int16)bolt.absDynEntId))
         {
             const DynEntityPose *dynEntPose =
-                DynEnt_GetClientPose(bolt.dobjHandle);
+                DynEnt_GetClientPose((unsigned __int16)bolt.absDynEntId);
 
             effect->frameNow.origin[0] = dynEntPose->pose.origin[0];
             effect->frameNow.origin[1] = dynEntPose->pose.origin[1];

@@ -845,7 +845,6 @@ void __cdecl R_StoreWindowSettings(const GfxWindowParms *wndParms)
     bool v2; // [esp+0h] [ebp-3Ch]
     int monitorHeight; // [esp+2Ch] [ebp-10h]
     int monitorWidth; // [esp+30h] [ebp-Ch]
-    int aspectHeight; // [esp+38h] [ebp-4h]
 
     if ( !r_aspectRatio
         && !Assert_MyHandler("C:\\projects_pc\\cod\\codsrc\\src\\gfx_d3d\\r_init.cpp", 476, 0, "%s", "r_aspectRatio") )
@@ -871,22 +870,14 @@ void __cdecl R_StoreWindowSettings(const GfxWindowParms *wndParms)
                 monitorWidth = vidConfig.displayWidth;
                 monitorHeight = vidConfig.displayHeight;
             }
-            // KB decompilation fix (MP and zombies): round, not truncate (SP 0x006b696f: fld; fadd qword [0x009D3F88]; fistp).
-            // With auto aspect at 1280x768 / 1600x960 / 800x480 the exe picks 16:10 where the truncation picked 16:9.
-            aspectHeight = I_RoundBiasToInt((float)((float)((float)monitorHeight * 16.0) / (float)monitorWidth));
-            if ( aspectHeight == 10 )
-            {
-                vidConfig.aspectRatioWindow = 1.6f;
-            }
-            else if ( aspectHeight >= 10 )
-            {
+            // widescreen: auto uses the monitor's real aspect ratio instead of snapping to 4:3 / 16:10 / 16:9, so
+            // ultrawide (21:9, 24:10, 32:9) is not stretched. FOV is Hor+ (cg_fov is fixed at 4:3) and the 640x480
+            // UI stays centred with edge-aligned HUD at the edges, so nothing else needs to change. Narrower than 4:3
+            // (5:4) is still treated as 4:3, as the exe did: the virtual UI cannot get narrower than 640 wide.
+            // Exact 4:3, 16:10 and 16:9 resolutions give the same floats as the exe's constants.
+            vidConfig.aspectRatioWindow = (float)monitorWidth / (float)monitorHeight;
+            if ( vidConfig.aspectRatioWindow < (1.0f + (1.0f / 3.0f)) )
                 vidConfig.aspectRatioWindow = (1.0f + (1.0f / 3.0f));
-            }
-            else
-            {
-                //vidConfig.aspectRatioWindow = FLOAT_1_7777778;
-                vidConfig.aspectRatioWindow = 1.7777778f;
-            }
             break;
         case 1:
             vidConfig.aspectRatioWindow = (1.0f + (1.0f / 3.0f));

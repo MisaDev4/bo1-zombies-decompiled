@@ -1,24 +1,8 @@
 #pragma once
 
-#ifdef TRACY_ENABLE
-#ifndef TRACY_ON_DEMAND
-#error This should be left ON
-#endif
-
-#include <tracy/public/tracy/Tracy.hpp>
-#include <tracy/public/tracy/TracyC.h>
-//#include <tracy/Tracy.hpp>
-//#include <tracy/TracyC.h>
-
-#define PROF_SCOPED_RUNTIME_NAME(name) ZoneScoped; ZoneName(name, strlen(name));
-#define PROF_SCOPED(name) ZoneScopedN(name)
-#define PROFLOAD_SCOPED(name) PROF_SCOPED(name)
-#define PROF_THREADNAME(threadname) tracy::SetThreadName(threadname)
-#else
-
-// zombies (p1): without Tracy, PROF_SCOPED feeds a small zone profiler - measurement only, off unless the headless
-// command line sets bo1_frameperf (win_main.cpp). Per zone: inclusive time of the current frame on the main thread
-// (outermost entry only) and on all other threads, read and cleared once per frame by G_SP_FramePerfEnd.
+// zombies (p1): the bo1_frameperf measurement state (zones, first-use and render counters, the render frame ring) is
+// declared and defined in every build. Only PROF_SCOPED differs: with Tracy (Debug, Profile) it opens a Tracy zone
+// instead of a BO1ProfZone, so the frameperf report then lists no zones.
 #include <intrin.h>
 
 struct BO1ProfZone
@@ -95,6 +79,26 @@ struct BO1RenderFrame
 };
 #define BO1_RENDER_RING 64
 extern BO1RenderFrame g_bo1RenderRing[BO1_RENDER_RING]; // index frame % BO1_RENDER_RING
+
+#ifdef TRACY_ENABLE
+#ifndef TRACY_ON_DEMAND
+#error This should be left ON
+#endif
+
+#include <tracy/public/tracy/Tracy.hpp>
+#include <tracy/public/tracy/TracyC.h>
+//#include <tracy/Tracy.hpp>
+//#include <tracy/TracyC.h>
+
+#define PROF_SCOPED_RUNTIME_NAME(name) ZoneScoped; ZoneName(name, strlen(name));
+#define PROF_SCOPED(name) ZoneScopedN(name)
+#define PROFLOAD_SCOPED(name) PROF_SCOPED(name)
+#define PROF_THREADNAME(threadname) tracy::SetThreadName(threadname)
+#else
+
+// zombies (p1): without Tracy, PROF_SCOPED feeds a small zone profiler - measurement only, off unless the headless
+// command line sets bo1_frameperf (win_main.cpp). Per zone: inclusive time of the current frame on the main thread
+// (outermost entry only) and on all other threads, read and cleared once per frame by G_SP_FramePerfEnd.
 
 struct BO1ProfScope
 {

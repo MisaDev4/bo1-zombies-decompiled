@@ -15,7 +15,8 @@ plus the one setting `+set fs_game mods/sandbox`. In PowerShell, from the build 
 ```powershell
 cd build\Release
 $R = (Get-Location).Path
-.\BO1Zombies.exe +set fs_b $R +set fs_h $R +set r_fullscreen 0 +set bo1_zombies 1 +set fs_game mods/sandbox +devmap zombie_pentagon
+$G = (Get-Content ..\..\gamedir.txt -TotalCount 1).Trim()   # your Black Ops install, recorded by setup.ps1
+.\BO1Zombies.exe +set fs_b $R +set fs_h $R +set fs_cdpath $G +set r_fullscreen 0 +set bo1_zombies 1 +set fs_game mods/sandbox +devmap zombie_pentagon
 ```
 
 (`+set r_fullscreen 1` instead for full screen.) These are the settings the headless checks start the game with

@@ -253,7 +253,8 @@ const NetFieldList *__cdecl MSG_GetNetFieldList(netFieldTypes_t fieldType, bool 
         // zombies: SP clientState score widths (SP netfield table .rdata 0x00A5C130): score.score is an int
         // delta (type -79, any int; MP: signed 16 bits, hence MP's +-30000 score clamp), score.kills 32 bits
         // (MP 10) and score.headshots 16 bits (MP sends headshots as scoreboardColumns[0] in zombiemode,
-        // G_PopulateMatchState; 10 bits). Both local endpoints use this table; MP keeps its own.
+        // G_PopulateMatchState; 10 bits). scoreboardColumns[3] carries zombietron's score.scoreMultiplier there
+        // (SP 14 bits; g_scr_sp_zombietron.h). Both local endpoints use this table; MP keeps its own.
         static NetField clientFields[50];
         static const NetFieldList clientList = { clientFields, 50u, "spClientStateFields" };
         static bool initialized;
@@ -272,10 +273,43 @@ const NetFieldList *__cdecl MSG_GetNetFieldList(netFieldTypes_t fieldType, bool 
                     clientFields[i].bits = 16;
                     clientFields[i].bitsStr = "16";
                 }
+                else if ( !strcmp(clientFields[i].name, "score.scoreboardColumns[3]") )
+                {
+                    clientFields[i].bits = 14;
+                    clientFields[i].bitsStr = "14";
+                }
             }
             initialized = true;
         }
         return &clientList;
+    }
+    if ( fieldType == NET_FIELD_TYPE_OBJECTIVE && zombiemode && zombiemode->current.enabled )
+    {
+        // zombies: SP sends an objective's 3D marker in its objective configstring (Objective_Set3D, SP 0x007f7530:
+        // keys use3d, col3d, txt3d). The port sends the same values with the objective: use3D (enable bit and
+        // UI3D window, 5 bits), color as SP's colour index (3 bits; KB's RGBA colour is unused on SP levels) and
+        // the 3D text's CS_LOCALIZED_STRINGS index in the alt_3D_text slot (G_SP_SetObjective3DText).
+        static NetField objectiveFieldsSP[11];
+        static const NetFieldList objectiveListSP = { objectiveFieldsSP, 11u, "spObjectiveFields" };
+        static bool objectiveInitialized;
+        if ( !objectiveInitialized )
+        {
+            int n = 0;
+            for ( int i = 0; i < 9; ++i )
+            {
+                objectiveFieldsSP[n] = objectiveFields[i];
+                if ( !strcmp(objectiveFieldsSP[n].name, "color") )
+                {
+                    objectiveFieldsSP[n].bits = 3;
+                    objectiveFieldsSP[n].bitsStr = "3";
+                }
+                ++n;
+            }
+            objectiveFieldsSP[n++] = { "use3D", 36, 4, 5, 0u, "5", "0" };
+            objectiveFieldsSP[n++] = { "alt_3D_text", 44, 4, 10, 0u, "10", "0" };
+            objectiveInitialized = true;
+        }
+        return &objectiveListSP;
     }
     // zombies (L22): no zombiemode hud elem table. SP sends hud elems through its snapshot with MP's encodings:
     // SP hudElemFields 0x00A5D380 (45 rows = KB's 43 + fontScaleStartTime / fontScaleTime) has fontScale -86

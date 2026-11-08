@@ -115,7 +115,11 @@ if ($gameArgs.Count) {
     if ($value) { $logGame = $value }
 }
 $log = Join-Path (Join-Path $H $logGame) 'console_mp.log'
-$steamGame = 'C:\Program Files (x86)\Steam\steamapps\common\Call of Duty Black Ops'   # READ ONLY: only listed
+# the original install (setup.ps1 records it in gamedir.txt): the game reads main\*.iwd from there (fs_cdpath) and zone\
+# through a junction. READ ONLY: only listed
+$gameDirFile = Join-Path $repo 'gamedir.txt'
+if (-not (Test-Path $gameDirFile)) { throw 'gamedir.txt is missing: run setup.ps1 first' }
+$steamGame = (Get-Content $gameDirFile -TotalCount 1).Trim()
 $symbolizer = 'C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.44.35207\bin\Hostx64\x86\llvm-symbolizer.exe'
 
 if (-not (Test-Path (Join-Path $R 'BO1Zombies.exe'))) { throw "not built: $(Join-Path $R 'BO1Zombies.exe')" }
@@ -340,7 +344,7 @@ public static class BO1Headless
 '@
 }
 
-$argLine = "+set fs_b `"$R`" +set fs_h `"$H`" +set bo1_headless 1 +set net_ip 127.0.0.1 +set logfile 2"
+$argLine = "+set fs_b `"$R`" +set fs_h `"$H`" +set fs_cdpath `"$steamGame`" +set bo1_headless 1 +set net_ip 127.0.0.1 +set logfile 2"
 if ($Zombies) { $argLine += ' +set bo1_zombies 1' }
 if ($AutoQuitMs -gt 0) { $argLine += " +set bo1_autoquit $AutoQuitMs" }
 if ($Client) {

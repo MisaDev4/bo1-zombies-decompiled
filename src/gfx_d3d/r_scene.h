@@ -436,7 +436,7 @@ void __cdecl R_AddDObjToScene(
                 float scale);
 unsigned int __cdecl R_AllocSceneDObj();
 struct GfxParticleCloud *__cdecl R_AddParticleCloudToScene(Material *material);
-void __cdecl R_AddOmniLightToScene(const float *org, const float (*axis)[3], int radius, float r, float g, float b);
+void __cdecl R_AddOmniLightToScene(const float *org, const float (*axis)[3], float radius, float r, float g, float b);
 void __cdecl R_AddSpotLightToScene(const float *org, const float (*axis)[3], float radius, float r, float g, float b);
 float __cdecl R_GetDefaultNearClip();
 void __cdecl R_SetupViewProjectionMatrices(GfxViewParms *viewParms, bool offsetmatrix);

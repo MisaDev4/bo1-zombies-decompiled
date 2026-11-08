@@ -3116,6 +3116,60 @@ void __cdecl DB_GetXAsset(XAssetType type, XAssetHeader header)
     }
 }
 
+// zone\ is looked for next to the exe first (a copied install, or a folder linked to one). When the file is not there
+// it is looked for in the game install, fs_cdpath (setup.ps1 records it), so the build folder needs no copy or link of
+// the game's zone folder.
+// fs_cdpath from the process command line ('+set fs_cdpath "D:\Games\Call of Duty Black Ops"'; the last one wins). The
+// first zone (code_pre_gfx_mp) is opened before the file system has registered the dvar, so it cannot be read from it
+// yet. (Not sys_cmdline: Com_Init cuts that buffer up in place.)
+static bool DB_CmdlineInstallDir(char *out, size_t size)
+{
+    static const char name[] = "fs_cdpath";
+    const size_t len = sizeof(name) - 1;
+    const char *cmdline = GetCommandLineA();
+    bool found = false;
+
+    for ( const char *p = strstr(cmdline, name); p; p = strstr(p + len, name) )
+    {
+        const char *v = p + len;
+        const bool startsWord = p == cmdline || p[-1] == ' ' || p[-1] == '+' || p[-1] == '"';
+        if ( !startsWord || (*v != ' ' && *v != '"') )
+            continue;
+        while ( *v == ' ' )
+            ++v;
+        const bool quoted = *v == '"';
+        if ( quoted )
+            ++v;
+        size_t n = 0;
+        while ( *v && *v != (quoted ? '"' : ' ') && n + 1 < size )
+            out[n++] = *v++;
+        out[n] = 0;
+        found = n != 0;
+    }
+    return found;
+}
+
+static void DB_UseInstallZoneIfMissing(char *filename, unsigned int size, const char *zoneDir, const char *zoneName, const char *ext)
+{
+    // looked up once: the install does not change while the game runs, and at shutdown the engine loads a zone again
+    // after the file system (and with it fs_cdpath) is already gone
+    static char s_installDir[260];
+    char installPath[260];
+
+    if ( !s_installDir[0] )
+    {
+        if ( fs_cdpath && *fs_cdpath->current.string )
+            I_strncpyz(s_installDir, fs_cdpath->current.string, sizeof(s_installDir));
+        else
+            DB_CmdlineInstallDir(s_installDir, sizeof(s_installDir));
+    }
+    if ( GetFileAttributesA(filename) != INVALID_FILE_ATTRIBUTES || !s_installDir[0] )
+        return;
+    Com_sprintf(installPath, sizeof(installPath), "%s\\zone\\%s\\%s%s", s_installDir, zoneDir, zoneName, ext);
+    if ( GetFileAttributesA(installPath) != INVALID_FILE_ATTRIBUTES )
+        I_strncpyz(filename, installPath, size);
+}
+
 void __cdecl DB_BuildOSPath(const char *zoneName, const char *ext, unsigned int size, char *filename)
 {
     unsigned int CurrentLanguage; // eax
@@ -3137,6 +3191,7 @@ void __cdecl DB_BuildOSPath(const char *zoneName, const char *ext, unsigned int 
         languageName = SEH_GetLanguageName(3u);
     v5 = Sys_DefaultInstallPath();
     Com_sprintf(filename, size, "%s\\zone\\%s\\%s%s", v5, languageName, zoneName, ext);
+    DB_UseInstallZoneIfMissing(filename, size, languageName, zoneName, ext);
 }
 
 char __cdecl DB_IsUsingGermanPaths()
@@ -3169,6 +3224,7 @@ void __cdecl DB_BuildOSPath_Unlocalized(const char *zoneName, const char *ext, u
 
     v4 = Sys_DefaultInstallPath();
     Com_sprintf(filename, size, "%s\\zone\\Common\\%s%s", v4, zoneName, ext);
+    DB_UseInstallZoneIfMissing(filename, size, "Common", zoneName, ext);
 }
 
 void DB_PostLoadXZone()

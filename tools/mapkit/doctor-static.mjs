@@ -3,6 +3,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import zlib from 'node:zlib';
+import { zoneRoot as defaultZoneRoot } from './zone-root.mjs';
 
 export const kinds = ['room', 'box', 'stairs', 'spawn', 'zone', 'window', 'spawner', 'perk', 'wallbuy', 'node', 'door', 'debris', 'mysterybox', 'ent', 'powerswitch', 'pap', 'light', 'riser'];
 // mapkit-fix-3 mood lighting presets (cm_mapkit.cpp s_lightPresets); tint = color * intensity, 1 = the kit's flat grey
@@ -94,7 +95,8 @@ export function validateSchema(layout) {
 
 // Fastfile strings are a presence catalog, not proof that a typed asset loaded successfully.
 // Purchases and load diagnostics remain mandatory live checks. No Steam files are written.
-export function loadCatalog(zoneRoot = 'C:/Program Files (x86)/Steam/steamapps/common/Call of Duty Black Ops/zone') {
+// zoneRoot: the install's zone folder (see zone-root.mjs).
+export function loadCatalog(zoneRoot = defaultZoneRoot()) {
   const strings = new Set(), materials = new Set(), sources = [];
   for (const name of ['common_zombie', 'zombie_pentagon']) {
     const file = fs.readdirSync(zoneRoot).map(d => path.join(zoneRoot, d, `${name}.ff`)).find(f => fs.existsSync(f));

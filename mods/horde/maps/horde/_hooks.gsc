@@ -8,6 +8,7 @@ register()
 	maps\_modstack::add( "zombie_pentagon_ffotd::main_start", maps\horde\_horde::main_start );
 	maps\_modstack::add( "zombie_pentagon_ffotd::main_end", maps\horde\_horde::main_end );
 	// every other map: the shared hook of maps\_zombiemode::main()
+	maps\_modstack::add( "_zombiemode_ffotd::main_start", maps\horde\_horde::main_start );
 	maps\_modstack::add( "_zombiemode_ffotd::main_end", ::main_end_any_map );
 	// +set bo1_mod_zones zombie_temple: the Shangri-La enemy modules (mods/_stack/maps/mod_zones/zombie_temple.gsc runs
 	// this hook; the modules moved to mods/_stack/maps/_modenemies so mods/nightmare shares them)

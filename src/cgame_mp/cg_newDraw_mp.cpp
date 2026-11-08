@@ -499,6 +499,16 @@ void __cdecl CG_OwnerDraw(
         CG_SP_OwnerDraw_MiniScoreboard(localClientNum, &rect); // zombies: the points (SP CG_OwnerDrawHud 0x005accb0 -> 0x005bfed0)
         return;
     }
+    if ( ownerDraw == 322 && zombiemode && zombiemode->current.enabled )
+    {
+        CG_SP_DrawObjectiveIndicators(localClientNum); // zombies: 3D objective markers (SP 0x005accb0 case 0x142 -> 0x00643260)
+        return;
+    }
+    if ( ownerDraw == 354 && zombiemode && zombiemode->current.enabled )
+    {
+        CG_SP_OwnerDraw_ZombietronScores(localClientNum, &rect); // zombies: DOA's HUD (SP 0x005accb0 case 0x162 -> 0x0041fb80)
+        return;
+    }
     if ( ownerDraw > 284 )
     {
         switch ( ownerDraw )

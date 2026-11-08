@@ -1564,7 +1564,7 @@ void __cdecl QuatSlerp(const float *from, const float *to, float frac, float *re
     {
         v10 = acos(dot);
         v9 = sin(v10);
-        v8 = 1.0 - v10 * frac;
+        v8 = (1.0f - frac) * v10;
         v7 = sin(v8);
         scaleFrom = v7 / v9;
         v6 = v10 * frac;
@@ -3190,11 +3190,12 @@ void colorHueMatrix(float finalMatrix[4][4], float hue)
 
     memset(rot, 0, sizeof(rot));
 
-    rot[0][0] = 1.0f;  // luma unaffected
+    // Retail (BlackOps.exe 0x5453E0) rotates components 0 and 1; component 2 (row 2 of basis2 is the gray axis) is untouched.
+    rot[0][0] = c;
+    rot[0][1] = s;
+    rot[1][0] = -s;
     rot[1][1] = c;
-    rot[1][2] = -s;
-    rot[2][1] = s;
-    rot[2][2] = c;
+    rot[2][2] = 1.0f;
     rot[3][3] = 1.0f;
 
     memset(basis2, 0, sizeof(basis2));

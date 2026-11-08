@@ -285,11 +285,11 @@ void CG_AddPlayerSpriteDrawSurf(
     bool renderFxFlags = (nextSnap->ps.otherFlags & 6) != 0 && cent->nextState.number == nextSnap->ps.clientNum;
 
     if (!renderFxFlags || cgameGlob->renderingThirdPerson) {
-        float radius = 0.0f;
+        int spriteFlags = 0;
         float scale = 1.0f;
 
         if (fixedScreenSize) {
-            radius = 3.0f;
+            spriteFlags = 3;
             scale = (additionalRadiusSize + 5.0f) * 0.0043f;
         }
         else {
@@ -299,24 +299,24 @@ void CG_AddPlayerSpriteDrawSurf(
         float origin[3];
         DObj *obj = Com_GetClientDObj(cent->nextState.number, localClientNum);
 
-        Material *spriteMaterial = NULL;
         if (obj && CG_DObjGetWorldTagPos(&cent->pose, obj, scr_const.j_head, origin)) {
-            origin[1] += height + 21.0f;
+            origin[2] += height + 21.0f;
         }
         else {
             origin[0] = cent->pose.origin[0];
-            origin[1] = cent->pose.origin[1] + height + 82.0f;
-            origin[2] = cent->pose.origin[2];
+            origin[1] = cent->pose.origin[1];
+            origin[2] = cent->pose.origin[2] + height + 82.0f;
         }
 
         FxSprite sprite;
-        sprite.material = spriteMaterial;
+        sprite.material = material;
         sprite.pos[0] = origin[0];
         sprite.pos[1] = origin[1];
-        sprite.pos[2] = NAN; // original code had NaN for Z
-        sprite.rgbaColor[0] = *(int *)&scale; // original LODWORD(obj) hack
-        sprite.radius = cg_headIconMinScreenRadius->current.integer;
-        sprite.minScreenRadius = radius;
+        sprite.pos[2] = origin[2];
+        *(unsigned int *)sprite.rgbaColor = 0xFFFFFFFF;
+        sprite.radius = scale;
+        sprite.minScreenRadius = cg_headIconMinScreenRadius->current.value;
+        sprite.flags = spriteFlags;
 
         FX_SpriteAdd(&sprite);
     }

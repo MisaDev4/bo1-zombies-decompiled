@@ -1320,7 +1320,7 @@ void __cdecl FX_DrawElem_Light_NoCull(FxDrawState *draw)
     R_AddOmniLightToScene(
         draw->posWorld,
         dummyAxis,
-        int(draw->visState.size[0]),
+        draw->visState.size[0],
         (float)draw->visState.color[2] * 0.0039215689,
         (float)draw->visState.color[1] * 0.0039215689,
         (float)draw->visState.color[0] * 0.0039215689);

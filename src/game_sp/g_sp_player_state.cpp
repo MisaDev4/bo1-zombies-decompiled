@@ -1,5 +1,6 @@
 #include "g_sp_player_state.h"
 #include "g_scr_sp_players_x1.h"
+#include "g_scr_sp_zombietron.h"
 #include <game_mp/g_main_mp.h>
 #include <cstring>
 #include "g_sp_ext.h"
@@ -116,6 +117,7 @@ void G_SP_ClearPlayerBuiltinState(gclient_s *client)
     iassert(clientNum < ARRAY_COUNT(g_clients));
     memset(&s_playerState[clientNum], 0, sizeof(s_playerState[clientNum]));
     G_SP_ClearPlayerX1State(clientNum); // lane x1 side state
+    G_SP_ClearZombietronClientState(clientNum); // lane Z side state
 }
 
 void G_SP_ClearLevelBuiltinState()

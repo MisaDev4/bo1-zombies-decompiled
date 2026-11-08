@@ -93,6 +93,7 @@
 #include <devgui/devgui.h>
 #include <game_sp/g_sp_savegame.h>
 #include <game_sp/g_sp_measure.h>
+#include <game_sp/g_sp_horde_dvars.h>
 #include <cgame/cg_sp_playtrace.h>
 #include <bgame/bg_misc.h>
 
@@ -633,7 +634,12 @@ void __cdecl Com_InitDynamicRender()
     v1 = Com_IsMenuLevel(0);
     R_ExtraCam_Init(v1);
     v2 = Com_IsMenuLevel(0);
-    R_UI3D_OnetimeInit(0x80u, 0x80u, 0, v2, 0);
+    // BO1FIX: the SP front end (the "frontend" level) draws its whole menu onto the in-world monitor through
+    // this target, and at MP's 128x128 the 640x480 menu got ~5x fewer pixels and the small font - blurry text.
+    // Windows and UVs are normalized (ui3dsetwindow, ui3dUVSetup*), so only the pixel count changes; it stays
+    // square so the client script's windows keep their aspect. ~8 MB with its depth surface, front end only.
+    const unsigned __int16 ui3dSize = Com_IsSPFrontEndLevel(sv_mapname->current.string) ? 1024 : 0x80;
+    R_UI3D_OnetimeInit(ui3dSize, ui3dSize, 0, v2, 0);
 }
 
 void __cdecl Com_InitDynamicMemorySystems()
@@ -2316,16 +2322,14 @@ void Com_InitDvars()
     // _override dvars (1, flags 0x4000); SP GamerProfile_UpdateDvarsFromProfile (SP 0x0061F665..0x0061F6B8)
     // sets discovered = profile value || override. So on PC Five and Dead Ops Arcade are always selectable:
     // the front end's levels_zombie shows the Five row only when zombiefive_discovered is 1. MP registers 0.
-    // menu-1: deliberate deviation from SP (a deliberate choice): Dead Ops Arcade is not offered, so under bo1_zombies
-    // zombietron_discovered and its override are 0 (SP: 1 and 1), and zombietron_discovered is read only (0x40,
-    // not archived) so the players config's `seta zombietron_discovered "1"` cannot flip it back; the profile path
-    // (GamerProfile_UpdateDvarsFromProfile) leaves it 0 too. levels_zombie hides its row when it is not 1.
+    // levels_zombie hides the Dead Ops Arcade row while zombietron_discovered is not 1. (Deviation menu-1, which kept
+    // it 0 and read only under bo1_zombies, is withdrawn: Dead Ops Arcade is ported and offered as in SP.)
     const bool spDiscovered = bo1_zombies && bo1_zombies->current.enabled;
-    zombietron_discovered = _Dvar_RegisterBool("zombietron_discovered", 0, spDiscovered ? 0x4040u : 0x4001u, "Zombietron mode discovered");
+    zombietron_discovered = _Dvar_RegisterBool("zombietron_discovered", spDiscovered, 0x4001u, "Zombietron mode discovered");
     zombiefive_discovered = _Dvar_RegisterBool("zombiefive_discovered", spDiscovered, 0x4001u, "Zombie Five map discovered");
     if (spDiscovered)
     {
-        zombietron_discovered_override = _Dvar_RegisterBool("zombietron_discovered_override", 0, 0x4000u, "");
+        zombietron_discovered_override = _Dvar_RegisterBool("zombietron_discovered_override", 1, 0x4000u, "");
         zombiefive_discovered_override = _Dvar_RegisterBool("zombiefive_discovered_override", 1, 0x4000u, "");
     }
 
@@ -2378,6 +2382,7 @@ void Com_InitDvars()
         "mod: hybrid CPUs: 1 = server thread on P-cores + above-normal priority, 2 = also the client threads; no-op on non-hybrid CPUs");
     bo1_mod_priority = _Dvar_RegisterInt("bo1_mod_priority", 0, 0, 2, 0,
         "mod: 1 = process priority class above normal + main thread above normal, 2 = high class; 0 = as started");
+    G_SP_RegisterHordeDvars(); // mod: descriptions for the horde mod's dvars (console)
     CpuCount = Sys_GetCpuCount();
     sys_smp_allowed = _Dvar_RegisterBool("sys_smp_allowed", CpuCount > 1, 0x10u, "Allow multi-threading");
 #ifdef _DEBUG
@@ -2857,6 +2862,115 @@ void Com_LoadUiFastFile()
     }
 }
 
+// BO1FIX: SP plays the level's main\video\<map>_load.bik on the loading screen - the comic art with its
+// music - and this port never started it. The loading/briefing screen draws "$levelbriefing", so that
+// material is swapped (DB_ReplaceXAsset keeps its name) for the still loadscreen_<map> art while the
+// client shuts down (CL_ShutdownAll stops any cinematic), then for the engine's "cinematic" material - it
+// samples the playing Bink's frames (TEXTURE_SRC_CODE_CINEMATIC_*) - once the level's zones load and the
+// video starts. Maps that ship no video keep the still art. Both sources sit in never-freed zones
+// (loadscreen_<map>: code_post_gfx / patch; cinematic: code_post_gfx), so the clones cannot dangle.
+static bool s_mapLoadCinematicPlaying;
+static volatile bool s_mapLoadCinematicHandoffPending;
+static char s_mapLoadCinematicMap[64];
+static char s_mapLoadCinematicName[72]; // <map>_load, read by the render thread
+static bool s_levelBriefingHasLevelArt;  // a level's still art or video is in "$levelbriefing"
+
+static bool Com_MapLoadCinematicExists(const char *mapName)
+{
+    // the same lookup the player uses (working folder, then the game install in fs_cdpath)
+    return R_Cinematic_VideoExists(va("%s_load", mapName));
+}
+
+static void Com_SetLevelBriefingMaterial(const char *replacement)
+{
+    // Resolve both first: a lookup may wait for the asset (or time out on a missing one), and waiting while
+    // holding CRITSECT_DBHASH would block the database thread that loads it.
+    Material_RegisterHandle((char *)"$levelbriefing", 0);
+    Material_RegisterHandle((char *)replacement, 0);
+    // the render thread draws the loading screen under CRITSECT_DBHASH (RB_RenderThread)
+    Sys_EnterCriticalSection(CRITSECT_DBHASH);
+    DB_ReplaceXAsset(ASSET_TYPE_MATERIAL, (char *)"$levelbriefing", replacement);
+    Sys_LeaveCriticalSection(CRITSECT_DBHASH);
+    s_levelBriefingHasLevelArt = I_stricmp(replacement, "black") != 0;}
+
+// A material that did not resolve. The asset database stubs a missing one with a copy of its own default
+// material ("default", g_defaultAssetName), which Material_IsDefault - a test against the renderer's
+// "$default" - does not catch; both draw the checkerboard.
+static bool Com_IsMissingMaterial(Material *material)
+{
+    if (Material_IsDefault(material))
+        return true;
+    // looked up each time: zone loads re-create stubs, so a cached header can be a stale one
+    return material->textureTable == Material_RegisterHandle((char *)"default", 0)->textureTable;
+}
+
+// The level's still loading art, or black for a level that has none (the front end: there is no
+// loadscreen_frontend, and cloning the missing material would put the checkerboard on the screen).
+static void Com_SetLevelBriefingStillArt(const char *mapName)
+{
+    const char *stillArt = va("loadscreen_%s", mapName);
+    if (Com_IsMissingMaterial(Material_RegisterHandle((char *)stillArt, 0)))
+        stillArt = "black";
+    Com_Printf(16, "loading screen still art for '%s': %s\n", mapName, stillArt);
+    Com_SetLevelBriefingMaterial(stillArt);
+}
+
+static void Com_StartMapLoadCinematic(const char *mapName)
+{
+    if (IsDedicatedServer())
+        return;
+    if (!Com_MapLoadCinematicExists(mapName))
+    {
+        Com_Printf(16, "no loading video for '%s', keeping the still loading art\n", mapName);
+        return;
+    }
+    Com_Printf(16, "playing loading video '%s_load'\n", mapName);
+    I_strncpyz(s_mapLoadCinematicMap, mapName, sizeof(s_mapLoadCinematicMap));
+    Com_sprintf(s_mapLoadCinematicName, sizeof(s_mapLoadCinematicName), "%s_load", mapName);
+    s_mapLoadCinematicHandoffPending = true;
+    s_mapLoadCinematicPlaying = true;
+    // 2: loop, so the art and music last through a load longer than the video
+    R_Cinematic_StartPlayback_SP(s_mapLoadCinematicName, 2, 1.0f);
+}
+
+// BO1FIX: called before every screen draw (SCR_DrawScreenField, main or render thread).
+// - No zone defines "$levelbriefing": it is the stub the UI's first registration creates, with the placeholder
+//   texture, and zone loads reset stubs, so until a level's load swaps its art in (and again after a stub reset)
+//   the loading screen showed the checkerboard - at boot and on the way back to the menu. Draw black instead.
+// - The still art stays up until the loading video has a decoded frame; switching earlier showed whatever the
+//   cinematic images held (a stale frame of the previous video, or black) between the two.
+void __cdecl Com_UpdateLevelBriefingMaterial()
+{
+    // looked up each frame: the zone loads on the way back to the menu reset the stub to the database default
+    // (the checkerboard) under a new header, so a cached one goes stale
+    Material *briefing = Material_RegisterHandle((char *)"$levelbriefing", 0);
+    if (Com_IsMissingMaterial(briefing))
+        Com_SetLevelBriefingMaterial("black");
+    if (!s_mapLoadCinematicHandoffPending || !R_Cinematic_IsShowingFrameOf(s_mapLoadCinematicName))
+        return;
+    s_mapLoadCinematicHandoffPending = false;
+    Com_Printf(16, "loading screen: showing the loading video\n");
+    Com_SetLevelBriefingMaterial("cinematic");
+}
+
+// BO1FIX: called every client frame. The load is not over at the first snapshot: the first world frame
+// still sorts the materials and runs the shader warm pass (R_BeginFrame / RB_ShaderWarming, seconds behind
+// PATCH_SHADER_WARMING), so the video and its music run until that is done and the level fades in.
+void __cdecl Com_UpdateMapLoadCinematic(int localClientNum)
+{
+    if (!s_mapLoadCinematicPlaying || CL_GetLocalClientConnectionState(localClientNum) != CA_ACTIVE)
+        return;
+    if (!rgp.world || rgp.needSortMaterials)
+        return;
+    if (r_shaderWarming && r_shaderWarming->current.enabled && rgp.needMaterialPreload)
+        return;
+    s_mapLoadCinematicPlaying = false;
+    s_mapLoadCinematicHandoffPending = false;
+    R_Cinematic_StopPlayback();
+    // the stopped video's images go black; say so, rather than leave the cinematic material in place
+    Com_SetLevelBriefingMaterial("black");
+}
+
 void __cdecl Com_LoadMapLoadingScreenFastFile(const char *mapName)
 {
     if (!IsDedicatedServer())
@@ -2865,7 +2979,17 @@ void __cdecl Com_LoadMapLoadingScreenFastFile(const char *mapName)
         DB_ResetZoneSize(0);
         if (useFastFile->current.enabled)
             DB_ReleaseXAssets();
+        // BO1NOTE: the zombies loadscreen_<map> materials (and the menu_map_<map> thumbnails) live in the
+        // permanent code zones - code_post_gfx (theater, pentagon, cosmodrome, zombietron) and patch (the DLC
+        // and cod5 maps) - so there is no per-map loading-screen fastfile to load here, and the release above
+        // only clears in-use marks: lookups still find them.
         UI_SetLoadingScreenMaterial(mapName);
+        // BO1FIX: show the level's still art until Com_LoadLevelFastFiles starts its loading video (see
+        // above). A load that never reached the level (an error, a disconnect) left no video running: the
+        // client shutdown stops it, so forget it here.
+        s_mapLoadCinematicPlaying = false;
+        s_mapLoadCinematicHandoffPending = false;
+        Com_SetLevelBriefingStillArt(mapName);
     }
 }
 
@@ -2873,6 +2997,11 @@ void __cdecl Com_UnloadLevelFastFiles()
 {
     XZoneInfo zoneInfo[1]; // [esp+4h] [ebp-Ch] BYREF
 
+    // BO1FIX: the still loading art's image is streamed for the level and released with it, so the loading
+    // screen on the way back to the menu drew it as the placeholder checkerboard. Go black until the next
+    // level's load puts its own art in.
+    if ( !IsDedicatedServer() && s_levelBriefingHasLevelArt )
+        Com_SetLevelBriefingMaterial("black");
     if ( useFastFile->current.enabled )
     {
         zoneInfo[0].name = 0;
@@ -2895,6 +3024,9 @@ void __cdecl Com_LoadLevelFastFiles(char *mapName)
     zoneCount = 0;
     DB_ResetZoneSize(0);
     UI_SetLoadingScreenMaterial(mapName);
+    // BO1FIX: the client has shut down by now, so the level's loading video (art + music) can start; it
+    // plays through the zone load and stops at the first snapshot (CL_FirstSnapshot).
+    Com_StartMapLoadCinematic(mapName);
     Com_sprintf(levelPatchZoneName, 0x40u, "%s_patch", mapName);
     ControllerIndex = Com_LocalClient_GetControllerIndex(0);
     Cbuf_ExecuteBuffer(0, ControllerIndex, (char *)"ui_animate connect * meet 500 1;\n");

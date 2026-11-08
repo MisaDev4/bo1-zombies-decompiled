@@ -1,6 +1,7 @@
 #include <qcommon/cm_mapkit.h>
 #include <universal/profile.h>
 #include <algorithm>
+#include <game_sp/g_scr_sp_zombietron.h>
 #include <windows.h>
 #include <dbghelp.h>
 #include <clientscript/cscr_compiler.h>
@@ -585,6 +586,14 @@ gclient_s *__cdecl G_GetPlayerState(unsigned int clientNum)
 int __cdecl G_GetClientSize()
 {
     return 10720;
+}
+
+// zombies: false from G_InitGame's memset(&level) until it sets level.maxclients. A script compile error drops
+// the server inside that window (GScr_LoadScripts runs first), and SV_FinalMessage then builds a snapshot
+// header for the clients still connected from the previous level (the front end's local client).
+bool __cdecl G_HasClientStates()
+{
+    return level.maxclients > 0;
 }
 
 void __cdecl G_FreeEntities(bool clearTargets)
@@ -2396,7 +2405,8 @@ void G_PrintAllFastFileErrors()
     // Keep the build-error checks, using the SP zones selected by the zombie loader.
     G_PrintFastFileErrors(G_SP_IsSPLevel() ? (char*)"code_post_gfx" : (char*)"code_post_gfx_mp");
     // zombies: the SP front end loads no common zone (SP 0x004C8940..0x004C8966): nothing to report there.
-    if ( !Com_IsSPFrontEndRunning() )
+    // Nor does zombietron (Com_LoadCommonFastFile, SP 0x0082CB50).
+    if ( !Com_IsSPFrontEndRunning() && !(zombietron && zombietron->current.enabled) )
         G_PrintFastFileErrors(G_SP_IsSPLevel() ? (char*)"common_zombie" : (char*)"common_mp");
     G_PrintFastFileErrors((char *)sv_mapname->current.integer);
 }
@@ -3909,13 +3919,15 @@ int G_PopulateMatchState()
     // scripts' `attacker.headshots++` in maps/_gameskill). BO1Zombies's MP clientState has no such field, so in
     // zombiemode the headshots go to the client through the MP scoreboard-column transport (KB transport,
     // not the SP wire format). Scripts that set their own columns (setscoreboardcolumns) are left alone.
+    // On zombietron the other columns carry the HUD's boosters, lives and score multiplier (g_scr_sp_zombietron.h).
     if ( zombiemode && zombiemode->current.enabled
         && level.matchState.unarchivedState.scoreboardColumnTypes[0] == SB_TYPE_INVALID )
     {
+        const bool zt = zombietron && zombietron->current.enabled;
         level.matchState.unarchivedState.scoreboardColumnTypes[0] = SB_TYPE_HEADSHOTS;
-        level.matchState.unarchivedState.scoreboardColumnTypes[1] = SB_TYPE_NONE;
-        level.matchState.unarchivedState.scoreboardColumnTypes[2] = SB_TYPE_NONE;
-        level.matchState.unarchivedState.scoreboardColumnTypes[3] = SB_TYPE_NONE;
+        level.matchState.unarchivedState.scoreboardColumnTypes[1] = zt ? SB_ZT_BOOSTERS : SB_TYPE_NONE;
+        level.matchState.unarchivedState.scoreboardColumnTypes[2] = zt ? SB_ZT_LIVES : SB_TYPE_NONE;
+        level.matchState.unarchivedState.scoreboardColumnTypes[3] = zt ? SB_ZT_MULTIPLIER : SB_TYPE_NONE;
     }
     return result;
 }

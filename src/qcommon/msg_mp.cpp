@@ -432,6 +432,10 @@ NetField playerEntityStateFields[74] =
   { "lerp.apos.trType", 48, 1, 8, 0u, "MSG_TRAJECTORY_BITS", "0" },
   { "clientNum", 213, 1, 6, 0u, "CLIENT_BITS+1", "0" },
   { "otherEntityNum", 196, 2, 10, 0u, "GENTITYNUM_BITS", "0" },
+  // zombies: SP's player table (BlackOps.exe 0x00A58000 area) lists attackerEntityNum, loopSoundId and loopSoundFade
+  // as changing fields. MP had them at the end as NEVER_CHANGES, but zombie scripts play fading loop sounds on
+  // players (Call of the Dead), which printed "Field loopSoundFade changed ... when we thought it never would".
+  { "attackerEntityNum", 198, 2, 10, 0u, "GENTITYNUM_BITS", "0" },
   { "weaponModel", 216, 1, 4, 0u, "MAX_WEAPONMODEL_BITS", "0" },
   {
     "lerp.u.player.meleeWeaponModel",
@@ -450,6 +454,8 @@ NetField playerEntityStateFields[74] =
   { "lerp.u.player.vehicleType", 106, 1, 3, 0u, "VEHICLE_TYPES_BITS", "0" },
   { "lerp.u.player.vehicleAnimBoneIndex", 107, 1, 8, 0u, "MAX_BONE_BITS", "0" },
   { "lerp.u.player.vehicleSeat", 108, 1, 4, 0u, "MAX_VEHICLE_SEAT_BITS", "0" },
+  { "loopSoundId", 124, 4, 32, 0u, "SOUNDALIAS_BITS", "0" },
+  { "loopSoundFade", 208, 2, -16, 0u, "FADETIME_BITS", "0" },
   { "targetname", 206, 2, 16, 0u, "16", "0" },
   { "lerp.useCount", 116, 4, 6, 0u, "USE_COUNT_BITS", "0" },
   { "partBits[0]", 156, 4, 32, 0u, "32", "0" },
@@ -522,9 +528,6 @@ NetField playerEntityStateFields[74] =
     "NEVER_CHANGES"
   },
   { "time2", 120, 4, -97, 1u, "MSG_FIELD_TIME", "NEVER_CHANGES" },
-  { "loopSoundId", 124, 4, 32, 1u, "SOUNDALIAS_BITS", "NEVER_CHANGES" },
-  { "loopSoundFade", 208, 2, -16, 1u, "FADETIME_BITS", "NEVER_CHANGES" },
-  { "attackerEntityNum", 198, 2, 10, 1u, "GENTITYNUM_BITS", "NEVER_CHANGES" },
   {
     "lerp.apos.trTime",
     52,
@@ -663,9 +666,10 @@ NetField corpseEntityStateFields[68] =
     "NEVER_CHANGES"
   },
   { "time2", 120, 4, -97, 1u, "MSG_FIELD_TIME", "NEVER_CHANGES" },
-  { "loopSoundId", 124, 4, 32, 1u, "SOUNDALIAS_BITS", "NEVER_CHANGES" },
-  { "loopSoundFade", 208, 2, -16, 1u, "FADETIME_BITS", "NEVER_CHANGES" },
-  { "attackerEntityNum", 198, 2, 10, 1u, "GENTITYNUM_BITS", "NEVER_CHANGES" },
+  // zombies: SP's corpse table keeps these three here but marks them as changing (hint 0), as below.
+  { "loopSoundId", 124, 4, 32, 0u, "SOUNDALIAS_BITS", "0" },
+  { "loopSoundFade", 208, 2, -16, 0u, "FADETIME_BITS", "0" },
+  { "attackerEntityNum", 198, 2, 10, 0u, "GENTITYNUM_BITS", "0" },
   {
     "lerp.apos.trTime",
     52,

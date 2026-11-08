@@ -21,8 +21,13 @@
 <script type="text/javascript">
 // Launcher for the Black Ops 1 zombies build (not part of the original game). Starts the game the way the
 // original game is started: exe and game files from build\Release, borderless window. Defaults to vanilla.
-var KB = new ActiveXObject("Scripting.FileSystemObject").GetParentFolderName(new ActiveXObject("Scripting.FileSystemObject").GetParentFolderName(unescape(document.location.href).replace(/^file:\/+/i, "").replace(/\//g, "\\"))) + "\\build";
+var FSO = new ActiveXObject("Scripting.FileSystemObject");
+var REPO = FSO.GetParentFolderName(FSO.GetParentFolderName(unescape(document.location.href).replace(/^file:\/+/i, "").replace(/\//g, "\\")));
+var KB = REPO + "\\build";
 var R = KB + "\\Release", P = R;
+// the original game's install, recorded by setup.ps1 (gamedir.txt): the game reads its main\*.iwd from there (fs_cdpath)
+var INSTALL = "";
+try { var gf = FSO.OpenTextFile(REPO + "\\gamedir.txt", 1); INSTALL = gf.ReadLine().replace(/^\s+|\s+$/g, ""); gf.Close(); } catch (e) {}
 
 // maps: [bsp name, label, has a special-zombie spawner file in mods/horde (maps/<map>.zombie_temple.ents)]
 var MAPS = [
@@ -94,7 +99,7 @@ function refresh() {
 
 function args() {
   var m = MAPS[el("map").value];
-  var a = "+set fs_b \"" + R + "\" +set fs_h \"" + P + "\" +set logfile 2 +set net_ip 127.0.0.1 +set bo1_zombies 1" +
+  var a = "+set fs_b \"" + R + "\" +set fs_h \"" + P + "\" +set fs_cdpath \"" + INSTALL + "\" +set logfile 2 +set net_ip 127.0.0.1 +set bo1_zombies 1" +
           " +set r_fullscreen 0 +set r_borderless 1 +set vid_xpos 0 +set vid_ypos 0" +
           " +set bo1_mod_sharedconfig 1"; // one players\config.cfg (binds, sensitivity) for every mod
   if (el("fps").checked) a += " +set bo1_fpscounter 1";
@@ -124,6 +129,7 @@ function args() {
 }
 
 function play() {
+  if (!INSTALL) { alert("Run setup.ps1 first: it records where your Black Ops install is (gamedir.txt)."); return; }
   var fso = new ActiveXObject("Scripting.FileSystemObject");
   var sh = new ActiveXObject("WScript.Shell");
   // latest build: copy the exe, pdb and dlls from Release to Play (skipped if a build has them locked)

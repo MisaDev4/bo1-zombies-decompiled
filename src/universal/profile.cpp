@@ -1,6 +1,5 @@
 #include "profile.h"
 
-#ifndef TRACY_ENABLE
 #include <windows.h>
 
 // zombies (p1): the zone profiler behind PROF_SCOPED (profile.h). Measurement only; g_bo1ProfOn is set by
@@ -76,7 +75,6 @@ int BO1_ProfFirstUseNames(char *out, int size)
     ReleaseSRWLockExclusive(&s_firstLock);
     return dropped;
 }
-#endif
 
 // mod (L43): bo1_mod_svprof (profile.h SvProfScope); the window report is BO1_SvProfFrame in sv_main_mp.cpp
 volatile int g_svProfOn;

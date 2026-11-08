@@ -1268,7 +1268,10 @@ void __cdecl SV_DropClient(client_t *drop, const char *reason, bool tellThem, bo
 
         I_strncpyz(droppedClientName, Com_DisplayName(drop->name, drop->clanAbbrev, 3), 32);
         clientNum = drop - svs.clients;
-        if ((unsigned int)clientNum >= level.maxclients
+        // zombies: no game clients to index while G_InitGame has not set them up (G_HasClientStates): a script
+        // compile error drops the server from GScr_LoadScripts and SV_Shutdown then drops the clients still
+        // connected from the previous level. Only the BO1_LIVE match record below reads level.clients.
+        if (G_HasClientStates() && (unsigned int)clientNum >= level.maxclients
             && !Assert_MyHandler(
                 "C:\\projects_pc\\cod\\codsrc\\src\\server_mp\\sv_client_mp.cpp",
                 2360,
@@ -1280,7 +1283,7 @@ void __cdecl SV_DropClient(client_t *drop, const char *reason, bool tellThem, bo
             __debugbreak();
         }
 #ifdef BO1_LIVE
-        if (onlinegame->current.enabled && com_sv_running->current.enabled)
+        if (onlinegame->current.enabled && com_sv_running->current.enabled && G_HasClientStates())
             MatchRecordPlayerDetails(&level.clients[clientNum], reason);
 #endif
         // ADD

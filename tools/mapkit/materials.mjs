@@ -5,10 +5,12 @@
 import fs from 'node:fs';
 import zlib from 'node:zlib';
 import path from 'node:path';
+import { zoneRoot as defaultZoneRoot } from './zone-root.mjs';
 
 const map = process.argv[2] || 'zombie_pentagon';
 const filter = new RegExp(process.argv[3] || '.', 'i');
-const zoneRoot = 'C:/Program Files (x86)/Steam/steamapps/common/Call of Duty Black Ops/zone';
+// the install's zone folder (see zone-root.mjs)
+const zoneRoot = defaultZoneRoot();
 let file = null;
 for (const dir of fs.readdirSync(zoneRoot)) {
     const p = path.join(zoneRoot, dir, map + '.ff');

@@ -198,6 +198,8 @@ void __cdecl Com_WriteDefaults_f();
 double __cdecl Com_GetTimescaleForSnd();
 void Com_LoadUiFastFile();
 void __cdecl Com_LoadMapLoadingScreenFastFile(const char *mapName);
+void __cdecl Com_UpdateMapLoadCinematic(int localClientNum);
+void __cdecl Com_UpdateLevelBriefingMaterial();
 void __cdecl Com_UnloadLevelFastFiles();
 void __cdecl Com_LoadLevelFastFiles(char *mapName);
 char *__cdecl Com_GetLevelSharedFastFile(char *mapName);
